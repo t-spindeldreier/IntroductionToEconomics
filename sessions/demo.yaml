@@ -1,0 +1,66 @@
+# Demo session: harmless content that shows every activity type.
+# Load it on the stage page with "Load the demo session", or copy it as a
+# starting point for your own file. The format is explained in the README.
+title: "Demo session"
+
+activities:
+
+  # A numeric guess with two hidden versions. Each phone gets one of them at random.
+  un-members:
+    type: guess
+    stageText: "How many member states does the United Nations have?"
+    stageHint: "Answer on your phone. Keep your screen to yourself."
+    part1: "Does the United Nations have more or fewer than **{anchor}** member states?"
+    part1Options: [More, Fewer]
+    part2: "Your best guess: ___ member states."
+    arms:
+      - { label: A, anchor: 60 }
+      - { label: B, anchor: 600 }
+    min: 0
+    exclusiveMin: true
+    max: 100000
+    axis: { min: 1, max: 10000 }
+    revealHeadline: "You did not all get the same question."
+    truth: { value: 193, label: "193 member states" }
+
+  # An untimed, unscored poll with a correct answer.
+  warm-up:
+    type: choice
+    question: "True or false?"
+    options: ["True", "False"]
+    items:
+      - text: "A tomato is, botanically speaking, a fruit."
+        correct: "True"
+        source: "Any botany textbook"
+
+  # A timed, scored quiz.
+  quiz:
+    type: choice
+    question: "Quick quiz"
+    timed: 20
+    scored: true
+    items:
+      - text: "Which planet is closest to the sun?"
+        options: [Venus, Mercury, Mars, Earth]
+        correct: Mercury
+        explanation: "Mercury orbits at about 58 million kilometres."
+      - text: "How many minutes are there in a day?"
+        options: ["1,240", "1,440", "2,400", "3,600"]
+        correct: B
+        explanation: "24 hours times 60 minutes."
+
+  talk:
+    type: prompt
+    text: "With your neighbour: why might two groups give different guesses to the same question?"
+    timer: 30
+    reveal: "The first number people see pulls their guess towards it. Psychologists call this anchoring."
+
+steps:
+  - { activity: lobby, collect: un-members }
+  - { activity: un-members, phases: [closed] }
+  - warm-up
+  - { activity: un-members, phases: [versions, results, truth] }
+  - talk
+  - quiz
+  - podium
+  - end

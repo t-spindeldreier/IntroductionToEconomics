@@ -1,0 +1,19 @@
+# --- Never publish: quiz answers and course material (brief, section 5.6) ---
+CLAUDE_CODE_BRIEF.md
+*.pdf
+sessions/private/
+
+# --- Build and tooling ---
+node_modules/
+dist/
+.tools/
+.firebase/
+*.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+smoke-shots/
+exports/
+.env
+.env.*
+.claude/

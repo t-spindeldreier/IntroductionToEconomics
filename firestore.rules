@@ -1,0 +1,140 @@
+rules_version = '2';
+
+// Security rules for Econ Live. There is no server: these rules are the only
+// protection, so read them before changing the data model. Every guarantee below
+// has a test in tests/rules/.
+//
+// Who is who
+//   Host     signed in with Google AND listed in config/hosts.uids.
+//   Student  not signed in at all. A student is whoever knows a 32-character secret
+//            that the phone generated. The secret is part of the ids of the documents
+//            the phone writes; the public id (pid) is the first 16 hex digits of
+//            sha256(secret) and is recomputed here, so it cannot be forged.
+//
+// Cost: every get() below is billed as one document read.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Must equal the lengths of ADJECTIVES and ECONOMISTS in src/core/nicknames.ts
+    // (a unit test compares them).
+    function nAdj() { return 48; }
+    function nEco() { return 64; }
+
+    function isHost() {
+      return request.auth != null
+        && request.auth.uid in get(/databases/$(database)/documents/config/hosts).data.uids;
+    }
+
+    function roomOf(code) {
+      return get(/databases/$(database)/documents/rooms/$(code)).data;
+    }
+
+    // A room accepts student writes only while it is open and not expired, so the
+    // database is inert outside class even if the host forgets to close the room.
+    function isLive(room) {
+      return room.status == 'open' && request.time < room.expiresAt;
+    }
+
+    function validSecret(secret) {
+      return secret.matches('^[a-z0-9]{32}$');
+    }
+
+    function pidOf(secret) {
+      return hashing.sha256(secret).toHexString().lower()[0:16];
+    }
+
+    // ----- host allowlist: edited by hand in the Firebase console -----
+    match /config/hosts {
+      allow get: if request.auth != null && request.auth.uid in resource.data.uids;
+    }
+
+    // ----- session files, including all answers: hosts only -----
+    match /sessions/{sessionId} {
+      allow read, write: if isHost();
+    }
+
+    match /rooms/{code} {
+      // Public room state. Readable by whoever knows the code; never listable.
+      allow get: if true;
+      allow list, create, update, delete: if isHost();
+
+      // ----- participants: document id = the phone's secret -----
+      match /participants/{secret} {
+        allow get: if true; // knowing the id means it is yours
+        allow list, delete: if isHost();
+        allow create: if isHost() || (
+          validSecret(secret)
+          && isLive(roomOf(code))
+          && request.resource.data.keys().hasOnly(['pid', 'adj', 'eco', 'joinedAt'])
+          && request.resource.data.keys().hasAll(['pid', 'adj', 'eco', 'joinedAt'])
+          && request.resource.data.pid == pidOf(secret)
+          && validNick(request.resource.data)
+          && request.resource.data.joinedAt == request.time
+        );
+        // A student may only re-roll the nickname.
+        allow update: if isHost() || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adj', 'eco'])
+          && validNick(request.resource.data)
+          && isLive(roomOf(code))
+        );
+      }
+
+      // ----- responses: document id = "<key>_<secret>", create-only -----
+      match /responses/{responseId} {
+        allow get: if true; // lets a phone check after a reload whether its answer arrived
+        allow list, update, delete: if isHost();
+        allow create: if isHost() || validResponse(roomOf(code), responseId, request.resource.data);
+      }
+
+      // ----- aggregates: written by the stage at reveal time -----
+      // They do not exist before the reveal, which is what keeps them secret until then.
+      match /results/{resultId} {
+        allow get: if true;
+        allow list, write: if isHost();
+      }
+    }
+
+    function validNick(d) {
+      return d.adj is int && d.adj >= 0 && d.adj < nAdj()
+        && d.eco is int && d.eco >= 0 && d.eco < nEco();
+    }
+
+    function validResponse(room, responseId, d) {
+      let open = room.open;
+      let keyLen = open.key.size();
+      let secret = responseId[keyLen + 1:responseId.size()];
+      return isLive(room)
+        && open != null
+        // the id is "<the key that is open right now>_<secret>"
+        && responseId.size() == keyLen + 33
+        && responseId[0:keyLen + 1] == open.key + '_'
+        && validSecret(secret)
+        && d.pid == pidOf(secret)
+        // server time, not phone time
+        && d.at == request.time
+        // timed questions: only until the closing time (1.5 s grace for slow networks)
+        && (open.durationMs == null
+            || request.time < open.opensAt + duration.value(open.durationMs + 1500, 'ms'))
+        && (
+          (open.type == 'choice' && validChoice(open, d))
+          || (open.type == 'guess' && validGuess(open, d))
+        );
+    }
+
+    function validChoice(open, d) {
+      return d.keys().hasOnly(['pid', 'v', 'at'])
+        && d.v is int && d.v >= 0 && d.v < open.n;
+    }
+
+    function validGuess(open, d) {
+      return d.keys().hasOnly(['pid', 'v', 'p1', 'at'])
+        && d.v is number
+        && (open.xmin ? d.v > open.min : d.v >= open.min)
+        && d.v <= open.max
+        && (open.p1
+            ? (d.p1 is int && d.p1 >= 0 && d.p1 <= 1)
+            : !('p1' in d));
+    }
+  }
+}

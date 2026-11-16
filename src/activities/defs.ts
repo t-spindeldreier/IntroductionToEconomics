@@ -1,0 +1,23 @@
+// Registry of activity types (the part without any screen code).
+// To add a type: write <type>/def.ts, <type>/phone.ts and <type>/stage.ts, then add
+// one line here, one in phoneViews.ts and one in stageViews.ts. The engine itself
+// (session compiler, stage controller, phone client, rules) does not change, unless
+// the new type needs a new kind of answer.
+
+import type { ActivityDef } from '../core/types';
+import { guessDef } from './guess/def';
+import { choiceDef } from './choice/def';
+import { promptDef } from './prompt/def';
+import { lobbyDef, podiumDef, endDef } from './simple/def';
+
+export const defs: Record<string, ActivityDef> = {
+  lobby: lobbyDef,
+  guess: guessDef,
+  choice: choiceDef,
+  prompt: promptDef,
+  podium: podiumDef,
+  end: endDef,
+};
+
+/** Types that may be used in steps without being declared under "activities". */
+export const BUILT_IN = ['lobby', 'podium', 'end'];
