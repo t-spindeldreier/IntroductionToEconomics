@@ -8,6 +8,7 @@ import { countOptions, logPosition, median, parseGuess } from '../../src/core/st
 import { leaderboard, pointsFor } from '../../src/core/scoring';
 import { compileSession, nextLabel } from '../../src/core/session';
 import { toCsv } from '../../src/core/csv';
+import { studySlidesHtml } from '../../src/core/handout';
 
 describe('sha256 and identity', () => {
   it('matches known SHA-256 values', () => {
@@ -126,7 +127,11 @@ describe('session files', () => {
     if (!r.ok) return;
     const { session } = r;
     // 1 lobby + 1 close + 6x2 + 1 + 3 reveals + 4 + 1 + 2 + 8x3 + podium + 2 + end
-    expect(session.frames.length).toBe(1 + 1 + 12 + 1 + 3 + 4 + 1 + 2 + 24 + 1 + 2 + 1);
+    expect(session.frames.length).toBe(1 + 1 + 12 + 1 + 3 + 4 + 1 + 2 + 24 + 1 + 2 + 1 + 5); // + 5 section slides
+    expect(session.sections.map((s) => s.title)).toEqual(
+      ['Real or fake?', 'The experiment you were part of', 'Design clinic', 'Speed quiz', 'Exam minute']);
+    expect(session.frames[0].section).toBe(-1);
+    expect(session.frames.at(-1)!.section).toBe(4);
     expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4, 5, 0, 6, 6]);
     expect(session.activities.rf.items.map((i: any) => i.correct)).toEqual([0, 1, 0, 0, 1, 0]);
     // the hint before the first reveal must not say "versions"
@@ -169,6 +174,33 @@ describe('session files', () => {
     expect(errors([{ activity: 'p', phases: ['reveal'] }])).toContain('"reveal" is not a phase');
     expect(errors([{ activity: 'p', collect: 'p' }])).toContain('only allowed on the lobby step');
     expect(errors(['lobby', 'p', 'end'])).toBe('');
+  });
+});
+
+describe('study slides', () => {
+  it('contains questions, correct answers and class results, and escapes markup', () => {
+    const r = compileSession({
+      title: 'Demo <b>',
+      activities: {
+        q: { type: 'choice', question: 'Pick', options: ['Yes', 'No <i>'], items: [{ text: 'Is it?', correct: 2, explanation: 'Because.' }] },
+        p: { type: 'prompt', text: 'Discuss **this**', mode: 'pair', reveal: 'Model' },
+      },
+      steps: [{ section: 'Part one' }, 'q', 'p'],
+    });
+    if (!r.ok) throw new Error(r.errors.join());
+    const live = {
+      responses: (key: string) => (key === 'q-1' ? [0, 1, 1, 1].map((v, i) => ({ key, pid: 'p' + i, v, at: 0, fake: false })) : []),
+      participants: new Map(), timing: () => null,
+    };
+    const html = studySlidesHtml(r.session, live, 'ABCD');
+    expect(html).toContain('Demo &lt;b&gt;');
+    expect(html).toContain('Part 1 of 1');
+    expect(html).toContain('✓ No &lt;i&gt;');
+    expect(html).toContain('75%');
+    expect(html).toContain('Because.');
+    expect(html).toContain('Discuss <strong>this</strong>');
+    expect(html).toContain('With your neighbour');
+    expect(html).not.toContain('<i>');
   });
 });
 

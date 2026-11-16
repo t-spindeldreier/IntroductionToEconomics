@@ -28,6 +28,20 @@ export const lobbyDef: ActivityDef = {
   },
 };
 
+/** Section: a title slide that starts a new part of the session. Written as { section: "Title" } in steps. */
+export const sectionDef: ActivityDef = {
+  type: 'section',
+  validate: () => {},
+  itemCount: () => 0,
+  phases: () => ['show'],
+  defaultPhases: () => ['show'],
+  phaseLabel: () => S.phase.section,
+  stepLabel: (a) => `${S.step.section} ${a.number}: ${a.title}`,
+  enter: ({ session, activity }) => ({
+    view: { type: 'section', title: activity.title, number: activity.number, of: session.sections.length },
+  }),
+};
+
 /** Podium: top 3 on stage, own final rank on the phone. */
 export const podiumDef: ActivityDef = {
   type: 'podium',

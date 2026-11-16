@@ -53,14 +53,19 @@ activities:
     type: prompt
     text: "With your neighbour: why might two groups give different guesses to the same question?"
     timer: 30
+    mode: pair          # pair, group, discuss, paper or think: shown as a label
+    revealTitle: "What is going on"
     reveal: "The first number people see pulls their guess towards it. Psychologists call this anchoring."
 
 steps:
   - { activity: lobby, collect: un-members }
   - { activity: un-members, phases: [closed] }
+  - { section: "Warm-up" }                       # a title slide that starts a new part
   - warm-up
+  - { section: "The experiment", subtitle: "Back to your guess from the start" }
   - { activity: un-members, phases: [versions, results, truth] }
   - talk
+  - { section: "Quiz", subtitle: "Fast and correct wins" }
   - quiz
   - podium
   - end

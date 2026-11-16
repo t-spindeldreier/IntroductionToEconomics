@@ -95,7 +95,8 @@ The allowlist lives only in the database, so no email address is in the reposito
 7. ← goes back one state. J shows the join code for latecomers.
 8. T starts or pauses a countdown. + adds 30 seconds (also to a running quiz question).
 9. H opens the step list to skip or jump. The audience sees it; it shows no answers.
-10. Afterwards: H, "Download CSV files", then "Close room" or "Delete all data of this room".
+10. Afterwards: H, "Download CSV files" and "Download study slides", then "Close room" or
+    "Delete all data of this room".
 
 A room accepts answers for six hours after it was created and then closes by itself.
 "Reopen room" in the H panel gives it six more hours.
@@ -173,6 +174,10 @@ the time left. Ties are broken by the lower total response time.
 | `text` | the prompt |
 | `timer` | countdown in seconds; `autostart: false` if it should wait for T |
 | `reveal` | hidden second text (a model answer, the real study), shown by the next press |
+| `revealTitle` | heading of that text; default "Answer" |
+| `mode` | how students work on it, shown as a label on stage and phones: `pair` (with your neighbour), `group`, `discuss` (class discussion), `paper` (on paper, on your own) or `think` |
+
+Guess and choice questions carry the label "On your phone" by themselves.
 
 **lobby**, **podium**, **end** need no declaration; just use them in `steps`.
 
@@ -193,6 +198,16 @@ steps:
 
 The same activity can appear in several steps, which is how collecting and revealing
 are separated.
+
+**Sections** give the session an outline, like a presentation:
+
+```yaml
+  - { section: "Speed quiz", subtitle: "Eight questions, 25 seconds each" }
+```
+
+Each one is a title slide ("Part 4 of 5") that lists all parts and marks the current
+one. Every screen after it carries a small "Part 4 of 5 · Speed quiz" marker, and
+phones show the title too. A section costs one key press.
 
 ## Export and delete data
 
@@ -221,13 +236,28 @@ d = pandas.read_csv("ABCD_responses.csv")
 `participant_id` is a random pseudonym that exists only for one room. It cannot be
 linked to a person, a device or another week.
 
+### Study slides
+
+H, "Download study slides" saves one file, `<CODE>_study_slides.html`. It has a slide
+for every question of the session with the correct answer, the explanation, the model
+answers of the prompts, both versions of the guess, and how the class answered (shares
+per option, medians per version). Download it before you delete the room, otherwise
+the class results are gone.
+
+- To hand it to students: upload the file to the course page as it is, or open it in
+  a browser and print to PDF (landscape, no margins); that gives one slide per page.
+- To put it into a presentation: print to PDF and insert the pages, or take
+  screenshots of single slides.
+
+The file contains all answers. Do not publish it before the session.
+
 H, "Delete all data of this room" removes all answers, participants, results and the
 room. It asks you to type the room code first.
 
 ## How it works
 
 ```
-src/core/         pure logic, unit-tested: ids, nicknames, medians, scoring, session compiler, CSV
+src/core/         pure logic, unit-tested: ids, nicknames, medians, scoring, session compiler, CSV, study slides
 src/activities/   one folder per activity type: def.ts (logic), phone.ts, stage.ts
 src/data/         the only code that talks to Firestore: phoneClient.ts, hostClient.ts
 src/phone/        the student page          src/stage/   the host pages (loaded only on #/stage)
@@ -262,8 +292,9 @@ secret is part of the ids of the documents the phone writes. The public id is th
 of the secret's SHA-256 hash, and the rules recompute it, so nobody can answer under
 another student's id.
 
-**Nicknames** are stored as two numbers (adjective, economist), never as text. Nothing a
-student types can reach the projector. If you edit the lists in `src/core/nicknames.ts`,
+**Nicknames** are drawn once at random and stored as two numbers (adjective, economist),
+never as text. A student cannot change the nickname, and nothing a student types can
+reach the projector. If you edit the lists in `src/core/nicknames.ts`,
 update the two numbers at the top of `firestore.rules`; a unit test reminds you.
 
 **Time.** Opening times and answer times are server timestamps. The rules reject answers
@@ -299,7 +330,7 @@ deployed site, with the demo session:
 1. Laptop: open the stage, create a room from the demo session, press F.
 2. Both phones: scan the QR code with the camera. Each should show a nickname and the
    more/fewer question within a few seconds. No zooming, no sideways scrolling.
-3. Phone A: tap the round arrow. The nickname changes.
+3. Both phones: check that the nickname cannot be changed anywhere.
 4. Compare the two phones: do they show different numbers in the question? (With two
    phones there is a 50% chance they match. Open a private tab to get another draw.)
 5. Phone A: answer, type a guess with a comma ("80,5"). The numeric keypad should
@@ -366,5 +397,6 @@ Ideas that were deliberately not built:
 - Showing last week's class data inside the app instead of in slides.
 - Firebase App Check to make scripted abuse harder.
 - A zip file instead of two CSV downloads.
+- Study slides as a PowerPoint file instead of HTML/PDF.
 - An exactly balanced split between arms instead of independent coin flips.
 - A dark theme for the stage.

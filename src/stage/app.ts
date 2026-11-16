@@ -13,6 +13,7 @@ import { h, replaceContent } from '../ui/dom';
 import { app, db, USE_EMULATOR } from '../data/firebase';
 import { compileSession, nextLabel } from '../core/session';
 import { msLeft } from '../core/timer';
+import { studySlidesHtml } from '../core/handout';
 import { ROOM_CODE_PATTERN } from '../core/identity';
 import {
   createRoom, deleteSession, listRooms, listSessions, loadSession, StageController, uploadSession,
@@ -208,8 +209,13 @@ async function openRoom(code: string): Promise<void> {
     const env: StageEnv = { ctl, session: ctl.session, room, frame, activity: ctl.session.activities[frame.id], joinUrl };
     const next = nextLabel(ctl.session, room.frame);
     const hasOwnCountdown = frame.type === 'prompt' || (frame.type === 'choice' && frame.phase === 'open');
+    const section = frame.section >= 0 ? ctl.session.sections[frame.section] : null;
     replaceContent(stageEl,
       stageViews[frame.type](env),
+      // Where we are in the session, like the footer of a slide deck.
+      section && frame.type !== 'section' ? h('div', { class: 'crumb' },
+        h('span', { class: 'crumb-part' }, S.part(frame.section + 1, ctl.session.sections.length)),
+        h('span', null, section.title)) : null,
       // An ad-hoc timer (key T) on a view that has no countdown of its own.
       !hasOwnCountdown && msLeft(room, ctl.now()) !== null ? stageCountdown(env) : null,
       h('div', { class: 'status-bar' },
@@ -237,8 +243,8 @@ async function openRoom(code: string): Promise<void> {
     redraw();
   };
 
-  const download = (name: string, text: string) => {
-    const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' })), download: name }) as HTMLAnchorElement;
+  const download = (name: string, text: string, type = 'text/csv') => {
+    const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` })), download: name }) as HTMLAnchorElement;
     document.body.append(a);
     a.click();
     a.remove();
@@ -277,6 +283,9 @@ async function openRoom(code: string): Promise<void> {
             h('label', { class: 'check small' },
               h('input', { type: 'checkbox', checked: ui.includeFakes, onchange: (e: Event) => { ui.includeFakes = (e.target as HTMLInputElement).checked; } }),
               ' ', S.includeFakes),
+            h('button', { class: 'btn small-btn', title: S.studyNote, onclick: () =>
+              download(`${room.code}_study_slides.html`, studySlidesHtml(ctl.session, ctl.live, room.code), 'text/html') }, S.studySlides),
+            h('p', { class: 'muted small' }, S.studyNote),
             room.status === 'open'
               ? h('button', { class: 'btn small-btn', onclick: () => void run(S.working, () => ctl.closeRoom()) }, S.closeRoom)
               : h('button', { class: 'btn small-btn', onclick: () => void run(S.working, () => ctl.reopenRoom()) }, S.reopenRoom),

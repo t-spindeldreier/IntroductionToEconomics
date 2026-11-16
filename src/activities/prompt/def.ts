@@ -7,6 +7,9 @@
 //   autostart  start the countdown as soon as the prompt appears (default true)
 //   reveal     hidden text, shown in a second phase
 //   label      optional short name for the host's step list
+//   mode       how students work on it, shown as a label on stage and phones:
+//              pair, group, discuss, paper or think
+//   revealTitle  heading of the hidden text (default "Answer")
 
 import { S } from '../../strings';
 import type { ActivityDef, EnterContext, FramePatch } from '../../core/types';
@@ -16,7 +19,9 @@ export const promptDef: ActivityDef = {
   type: 'prompt',
 
   validate(a, v) {
-    v.only(a, ['type', 'id', 'text', 'timer', 'autostart', 'reveal', 'label']);
+    v.only(a, ['type', 'id', 'text', 'timer', 'autostart', 'reveal', 'label', 'mode', 'revealTitle']);
+    if (a.mode !== undefined && !(a.mode in S.mode)) v.at('mode').err(`must be one of: ${Object.keys(S.mode).join(', ')}`);
+    v.text(a, 'revealTitle', { max: 60 });
     v.text(a, 'text', { required: true, max: 700 });
     v.text(a, 'reveal', { max: 900 });
     v.text(a, 'label', { max: 60 });
@@ -35,10 +40,11 @@ export const promptDef: ActivityDef = {
 
   enter({ activity: a, frame }: EnterContext): FramePatch {
     if (frame.phase === 'reveal') {
-      return { view: { type: 'prompt', key: a.id, phase: 'reveal', text: a.text, reveal: a.reveal } };
+      return { view: { type: 'prompt', key: a.id, phase: 'reveal', text: a.text, reveal: a.reveal,
+        mode: a.mode ?? null, revealTitle: a.revealTitle ?? null } };
     }
     return {
-      view: { type: 'prompt', key: a.id, phase: 'show', text: a.text },
+      view: { type: 'prompt', key: a.id, phase: 'show', text: a.text, mode: a.mode ?? null },
       timer: a.timer ? { durationMs: a.timer * 1000, autostart: a.autostart } : undefined,
     };
   },

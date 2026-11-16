@@ -83,6 +83,8 @@ export interface Session {
   activities: Record<string, Activity>;
   frames: Frame[];
   steps: Step[];
+  /** The parts of the session, from the "section" steps. Empty if the file has none. */
+  sections: { title: string; subtitle: string | null; firstFrame: number }[];
 }
 
 /** One entry in the host's step list: an activity (or one item of it). */
@@ -102,6 +104,7 @@ export interface Frame {
   phase: string;
   key: string; // response key: id, or id-<item+1>
   collect?: string; // lobby only: activity that is open for answers meanwhile
+  section: number; // index into session.sections; -1 before the first section
 }
 
 // ---------- The interface every activity type implements (core part) ----------

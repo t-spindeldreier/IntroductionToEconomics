@@ -7,7 +7,6 @@ export const S = {
   // ----- phone -----
   privacy: 'No names, no login. Your answers are anonymous and are shown in class in aggregate.',
   youAre: 'You are',
-  reroll: 'New nickname',
   joining: 'Joining…',
   lookAtScreen: 'Look at the screen',
   youAreIn: 'You are in.',
@@ -82,6 +81,23 @@ export const S = {
   timeUpStage: 'Time is up',
   source: 'Source',
 
+  // How students work on a prompt ("mode" in the session file).
+  mode: {
+    pair: 'With your neighbour',
+    group: 'In groups',
+    discuss: 'Class discussion',
+    paper: 'On paper, on your own',
+    think: 'Think for yourself',
+  } as Record<string, string>,
+  onYourPhone: 'On your phone',
+  part: (n: number, of: number) => `Part ${n} of ${of}`,
+  correctAnswer: 'Correct answer',
+  modelAnswer: 'Answer',
+  joinHeading: 'Join in',
+  joinSteps: ['Scan the code with your phone camera', 'or open the address and type the code'],
+  studySlides: 'Download study slides',
+  studyNote: 'One file with every question, the answers and the class results. Open it in a browser; print to PDF for one slide per page.',
+
   // phase labels for the "next: ..." hint. Deliberately vague where it matters.
   phase: {
     show: 'show',
@@ -91,11 +107,13 @@ export const S = {
     revealStep: (i: number, n: number) => `reveal (${i} of ${n})`,
     leaderboard: 'leaderboard',
     lobby: 'lobby',
+    section: 'next part',
     podium: 'podium',
     end: 'end',
   },
   step: {
     lobby: 'Lobby',
+    section: 'Part',
     podium: 'Podium',
     end: 'End',
     guess: 'Guess',

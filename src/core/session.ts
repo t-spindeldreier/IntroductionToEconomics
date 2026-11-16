@@ -30,6 +30,7 @@ export function compileSession(raw: unknown): CompileResult {
   }
   for (const [id, a] of Object.entries<any>(rawActivities)) {
     const av = v.at(`activities.${id}`);
+    if (id.startsWith('section-')) av.err('ids starting with "section-" are reserved');
     if (!ID_PATTERN.test(id)) av.err('the id may only contain lowercase letters, digits and hyphens (at most 30 characters)');
     if (typeof a !== 'object' || a === null) { av.err('must have a type'); continue; }
     const def = defs[a.type];
@@ -44,6 +45,7 @@ export function compileSession(raw: unknown): CompileResult {
   // ----- steps -----
   const frames: Frame[] = [];
   const steps: Step[] = [];
+  const sections: Session['sections'] = [];
   if (!Array.isArray(file.steps) || file.steps.length === 0) {
     v.at('steps').err('must be a list with at least one step');
     return fail();
@@ -54,6 +56,20 @@ export function compileSession(raw: unknown): CompileResult {
     const sv = v.at(`steps[${n + 1}]`);
     const step = typeof rawStep === 'string' ? { activity: rawStep } : rawStep;
     if (typeof step !== 'object' || step === null) return sv.err('must be an activity id or { activity: id, ... }');
+
+    // { section: "Title" } starts a new part of the session with a title slide.
+    if (step.section !== undefined) {
+      sv.only(step, ['section', 'subtitle']);
+      sv.text(step, 'section', { required: true, max: 80 });
+      sv.text(step, 'subtitle', { max: 160 });
+      if (typeof step.section !== 'string') return;
+      const id = `section-${sections.length + 1}`;
+      activities[id] = { type: 'section', id, title: step.section, subtitle: step.subtitle ?? null, number: sections.length + 1 };
+      sections.push({ title: step.section, subtitle: step.subtitle ?? null, firstFrame: frames.length });
+      steps.push({ index: steps.length, label: defs.section.stepLabel(activities[id], null), firstFrame: frames.length });
+      frames.push({ index: frames.length, step: steps.length - 1, type: 'section', id, item: null, phase: 'show', key: id, section: sections.length - 1 });
+      return;
+    }
     sv.only(step, ['activity', 'phases', 'items', 'collect']);
     const a = activities[step.activity];
     if (!a) return sv.err(`there is no activity "${step.activity}"`);
@@ -99,6 +115,7 @@ export function compileSession(raw: unknown): CompileResult {
           phase,
           key: item === null ? a.id : `${a.id}-${item + 1}`,
           ...(step.collect ? { collect: step.collect } : {}),
+          section: sections.length - 1,
         });
       }
     }
@@ -106,7 +123,7 @@ export function compileSession(raw: unknown): CompileResult {
 
   if (frames.length > 400) v.err('The session has more than 400 key presses. Split it.');
   if (v.errors.length > 0) return fail();
-  return { ok: true, session: { title: file.title, activities, frames, steps } };
+  return { ok: true, session: { title: file.title, activities, frames, steps, sections } };
 }
 
 /** The hint in the corner of the stage: what the next press of the right arrow does. */

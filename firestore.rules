@@ -72,12 +72,8 @@ service cloud.firestore {
           && validNick(request.resource.data)
           && request.resource.data.joinedAt == request.time
         );
-        // A student may only re-roll the nickname.
-        allow update: if isHost() || (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adj', 'eco'])
-          && validNick(request.resource.data)
-          && isLive(roomOf(code))
-        );
+        // The nickname is drawn once and cannot be changed by the student.
+        allow update: if isHost();
       }
 
       // ----- responses: document id = "<key>_<secret>", create-only -----

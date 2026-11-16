@@ -71,9 +71,8 @@ try {
   await shot(phones[0], 'phone-guess-part1');
   const nick = await phones[0].textContent('.nick strong');
   check(/^[\w-]+ \w+$/.test(nick), `phone got the nickname "${nick}"`);
-  await phones[0].click('.reroll');
-  await sleep(300);
-  const nick2 = await phones[0].textContent('.nick strong');
+  check((await phones[0].locator('.reroll').count()) === 0, 'there is no way to change the nickname');
+  const nick2 = nick;
 
   // Nothing on the stage may hint at two versions while collecting.
   const lobbyText = await stage.textContent('.stage');
@@ -115,9 +114,13 @@ try {
   const hint = async () => (await stage.textContent('.next-hint')).trim();
   check((await hint()) === 'next: close', `hint before closing is "${await hint()}"`);
 
-  await next('open'); // guess closed
+  await next('next part'); // guess closed
   await phones[0].getByText('Look at the screen').waitFor();
   await shot(phones[0], 'phone-waiting');
+  await next('open'); // section slide
+  await shot(stage, 'stage-section');
+  await phones[0].getByText('Part 1 of 3').waitFor();
+  await shot(phones[0], 'phone-section');
 
   await next('reveal'); // warm-up open
   await phones[0].waitForSelector('.two-buttons');
@@ -128,15 +131,17 @@ try {
   await shot(stage, 'stage-choice-open');
   check(!(await stage.textContent('.view')).includes('✓'), 'no correct answer on the stage before the reveal');
 
-  await next('reveal (1 of 3)'); // warm-up reveal
+  await next('next part'); // warm-up reveal
   await shot(stage, 'stage-choice-reveal');
+  check((await stage.textContent('.answer-card')).includes('Correct answer'), 'the reveal has a correct-answer card');
   await phones[0].getByText('Correct').waitFor();
   await shot(phones[0], 'phone-choice-reveal');
 
   // A reload of the stage in the middle resumes exactly here.
   await stage.reload();
-  await stage.getByText('next: reveal (1 of 3)').waitFor();
+  await stage.getByText('next: next part').waitFor();
   check((await stage.textContent('.view')).includes('botany'), 'a reloaded stage resumes on the same frame');
+  await next('reveal (1 of 3)'); // section slide
 
   await next('reveal (2 of 3)');
   await shot(stage, 'stage-guess-versions');
@@ -151,6 +156,7 @@ try {
 
   await next('reveal'); // prompt with a running countdown
   await stage.waitForSelector('.stage-countdown');
+  check((await stage.textContent('.view .pill')).includes('With your neighbour'), 'the prompt says how to work on it');
   await stage.keyboard.press('t'); // pause
   await stage.keyboard.press('+'); // 30 seconds more
   await sleep(500);
@@ -161,8 +167,9 @@ try {
   await stage.keyboard.press('j');
   await shot(stage, 'stage-join-overlay');
   await stage.keyboard.press('j');
-  await next('open');
+  await next('next part');
   await shot(stage, 'stage-prompt-reveal');
+  await next('open'); // section slide
 
   await next('reveal'); // quiz 1 open
   await phones[0].waitForSelector('.options');
@@ -208,6 +215,14 @@ try {
   await stage.getByRole('button', { name: 'Download CSV files' }).click();
   await sleep(1500);
   check(downloads.length === 2, `two CSV files downloaded (${downloads.join(', ')})`);
+  const [slides] = await Promise.all([stage.waitForEvent('download'), stage.getByRole('button', { name: 'Download study slides' }).click()]);
+  await slides.saveAs(`${OUT}/study_slides.html`);
+  const deck = await stageCtx.newPage();
+  await deck.goto(`file:///${process.cwd().replace(/\\/g, '/')}/${OUT}/study_slides.html`);
+  check((await deck.locator('.slide').count()) >= 8, 'the study slides open and contain the questions');
+  await deck.locator('.slide').nth(5).scrollIntoViewIfNeeded();
+  await shot(deck, 'study-slides');
+  await deck.close();
   await stage.getByRole('button', { name: 'Remove simulated students' }).click();
   await stage.getByText('0 simulated students').waitFor({ timeout: 20000 });
   check(true, 'simulated students removed');

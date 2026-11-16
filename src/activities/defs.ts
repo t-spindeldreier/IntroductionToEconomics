@@ -8,7 +8,7 @@ import type { ActivityDef, PhoneView } from '../core/types';
 import { guessDef } from './guess/def';
 import { choiceDef } from './choice/def';
 import { promptDef } from './prompt/def';
-import { lobbyDef, podiumDef, endDef } from './simple/def';
+import { lobbyDef, podiumDef, endDef, sectionDef } from './simple/def';
 
 export const defs: Record<string, ActivityDef> = {
   lobby: lobbyDef,
@@ -16,6 +16,7 @@ export const defs: Record<string, ActivityDef> = {
   choice: choiceDef,
   prompt: promptDef,
   podium: podiumDef,
+  section: sectionDef,
   end: endDef,
 };
 

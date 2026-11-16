@@ -8,6 +8,7 @@ import type { Activity } from '../../core/types';
 import { answerCount, type StageEnv, type StageViewFn } from '../../stage/env';
 import { ARM_COLOURS, dotPlot } from '../../stage/plots';
 import { part1Text, summariseGuess } from './def';
+import { modePill } from '../../ui/pill';
 
 /** The neutral question with the answer count. Also used by the lobby. */
 export function guessCollecting(a: Activity, env: StageEnv): HTMLElement {
@@ -20,7 +21,9 @@ export function guessCollecting(a: Activity, env: StageEnv): HTMLElement {
 export const guessStage: StageViewFn = (env) => {
   const a = env.activity;
   const phase = env.frame.phase;
-  if (phase === 'open' || phase === 'closed') return h('div', { class: 'view centered' }, guessCollecting(a, env));
+  if (phase === 'open' || phase === 'closed') {
+    return h('div', { class: 'view centered' }, phase === 'open' ? modePill('phone') : null, guessCollecting(a, env));
+  }
 
   const arms = summariseGuess(a, env.ctl.responses(a.id));
   const swatch = (i: number) => h('span', { class: 'swatch', style: `background:${ARM_COLOURS[i]}` });

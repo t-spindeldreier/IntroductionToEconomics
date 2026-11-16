@@ -59,9 +59,6 @@ export function startPhone(root: HTMLElement, code: string): void {
       h('div', { class: 'nick' },
         h('span', { class: 'muted small' }, S.youAre),
         h('strong', null, nickname(me.adj, me.eco))),
-      me.joined && room.status === 'open'
-        ? h('button', { class: 'reroll', title: S.reroll, 'aria-label': S.reroll, onclick: () => void client.reroll() }, '⟳')
-        : null,
       timer);
     return shell(header, body);
   };

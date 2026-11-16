@@ -5,7 +5,7 @@
 // reads the leaderboard document once per reveal, and never queries a collection.
 
 import {
-  doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc, type Firestore, type Unsubscribe,
+  doc, getDoc, onSnapshot, serverTimestamp, setDoc, type Firestore, type Unsubscribe,
 } from 'firebase/firestore';
 import type { PhoneView, RoomState } from '../core/types';
 import { pidOf, randomSecret } from '../core/identity';
@@ -201,22 +201,6 @@ export class PhoneClient {
     this.joining = false;
     this.save();
     this.emit();
-  }
-
-  /** One tap gives a new random nickname. */
-  async reroll(): Promise<void> {
-    const me = this.me;
-    if (!me || !me.joined) return;
-    Object.assign(me, randomNick());
-    this.save();
-    this.emit();
-    try {
-      this.meter.writes++;
-      this.meter.ruleReads++;
-      await updateDoc(this.participantRef(), { adj: me.adj, eco: me.eco });
-    } catch {
-      /* the stage keeps the previous nickname; harmless */
-    }
   }
 
   // ---------- answers ----------

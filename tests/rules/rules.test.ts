@@ -136,10 +136,10 @@ describe('joining', () => {
     await assertFails(setDoc(pDoc(student(), ann), participant(ann, { joinedAt: new Date(2020, 1, 1) })));
     await assertFails(setDoc(pDoc(student(), ann), participant(ann, { fake: true })));
   });
-  it('allows re-rolling the nickname, and nothing else', async () => {
+  it('does not let a student change the nickname or anything else afterwards', async () => {
     await assertSucceeds(setDoc(pDoc(student(), ann), participant(ann)));
-    await assertSucceeds(updateDoc(pDoc(student(), ann), { adj: 5, eco: 6 }));
-    await assertFails(updateDoc(pDoc(student(), ann), { adj: 999 }));
+    await assertFails(updateDoc(pDoc(student(), ann), { adj: 5, eco: 6 }));
+    await assertFails(setDoc(pDoc(student(), ann), participant(ann, { adj: 7 })));
     await assertFails(updateDoc(pDoc(student(), ann), { pid: pidOf(bob) }));
     await assertFails(updateDoc(pDoc(student(), ann), { joinedAt: serverTimestamp() }));
     await assertFails(deleteDoc(pDoc(student(), ann)));
