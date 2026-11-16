@@ -46,7 +46,10 @@ try {
   stage.on('dialog', (d) => d.accept(d.message().match(/Type (\w{4})/)?.[1] ?? ''));
   await stage.goto(BASE + '#/stage');
   await stage.click('#dev-sign-in');
-  await stage.getByText('Emulator only: put me on the host list').click();
+  // On a fresh emulator the test host is not on the list yet; on a used one it is.
+  const makeHost = stage.getByText('Emulator only: put me on the host list');
+  await Promise.race([makeHost.waitFor(), stage.getByText('Load the demo session').waitFor()]);
+  if (await makeHost.isVisible()) await makeHost.click();
   await stage.getByText('Load the demo session').click();
   await stage.getByText('Session uploaded.').waitFor();
   await shot(stage, 'host-home');
@@ -209,7 +212,7 @@ try {
   await stage.getByText('0 simulated students').waitFor({ timeout: 20000 });
   check(true, 'simulated students removed');
   await stage.getByRole('button', { name: 'Delete all data of this room' }).click();
-  await stage.getByText('No rooms yet.').waitFor({ timeout: 20000 });
+  await stage.getByText('Sessions', { exact: true }).waitFor({ timeout: 20000 });
   check(true, 'room deleted');
   await phones[0].getByText('This room does not exist').waitFor({ timeout: 10000 });
   check(true, 'phones of a deleted room show a calm message');

@@ -8,7 +8,9 @@ import { firebaseConfig } from '../firebase-config';
 export const USE_EMULATOR = import.meta.env.DEV;
 export const NOT_CONFIGURED = !USE_EMULATOR && firebaseConfig.projectId.startsWith('demo-');
 
-export const app = initializeApp(firebaseConfig);
+// During development everything runs against the offline demo project, so the
+// emulator never mixes with (or reaches) the real one.
+export const app = initializeApp(USE_EMULATOR ? { ...firebaseConfig, projectId: 'demo-econ-live' } : firebaseConfig);
 
 // Memory cache only: nothing about the session is written to the phone's disk by
 // Firebase. (Our own small identity record in localStorage is separate.)

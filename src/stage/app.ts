@@ -11,7 +11,6 @@ import demoYaml from '../../sessions/demo.yaml?raw';
 import { S } from '../strings';
 import { h, replaceContent } from '../ui/dom';
 import { app, db, USE_EMULATOR } from '../data/firebase';
-import { firebaseConfig } from '../firebase-config';
 import { compileSession, nextLabel } from '../core/session';
 import { msLeft } from '../core/timer';
 import { ROOM_CODE_PATTERN } from '../core/identity';
@@ -90,7 +89,7 @@ function showError(e: unknown): void {
 
 /** Development convenience. "Bearer owner" only works on the emulator. */
 async function devMakeHost(): Promise<void> {
-  await fetch(`http://${location.hostname}:8080/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/config/hosts`, {
+  await fetch(`http://${location.hostname}:8080/v1/projects/${app.options.projectId}/databases/(default)/documents/config/hosts`, {
     method: 'PATCH',
     headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields: { uids: { arrayValue: { values: [{ stringValue: user!.uid }] } } } }),
