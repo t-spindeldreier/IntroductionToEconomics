@@ -36,8 +36,8 @@ export function summariseGuess(a: Activity, responses: Resp[]): GuessArmSummary[
   return arms;
 }
 
-export function part1Text(a: { part1?: string }, anchor: unknown): string {
-  return (a.part1 ?? '').replace('{anchor}', String(anchor ?? ''));
+export function part1Text(a: Record<string, any>, anchor: unknown): string {
+  return String(a.part1 ?? '').replace('{anchor}', String(anchor ?? ''));
 }
 
 export const guessDef: ActivityDef = {

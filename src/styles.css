@@ -1,0 +1,117 @@
+/* Shared basics and the phone layout. System fonts only: nothing is loaded from
+   another server. The stage has its own file (stage/stage.css). */
+
+:root {
+  --ink: #16181d;
+  --ink-2: #4a4f5a;
+  --paper: #fcfcfb;
+  --card: #ffffff;
+  --line: #d9dbe0;
+  --blue: #0072b2; /* arm A, primary actions */
+  --orange: #d55e00; /* arm B */
+  --good: #1a7f4b;
+  --bad: #b3261e;
+  --radius: 14px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-text-size-adjust: 100%;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { overflow-x: hidden; }
+h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 0.5rem; }
+p { margin: 0 0 0.75rem; }
+a { color: var(--blue); }
+strong { font-weight: 700; }
+.muted { color: var(--ink-2); }
+.small { font-size: 0.8rem; }
+.center { text-align: center; }
+
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 56px; padding: 0.75rem 1rem; width: 100%;
+  font: inherit; font-size: 1.1rem; font-weight: 600; text-align: center; text-decoration: none;
+  color: var(--ink); background: var(--card);
+  border: 2px solid var(--ink); border-radius: var(--radius);
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.btn:active:not(:disabled) { background: var(--ink); color: var(--card); }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.option { justify-content: flex-start; text-align: left; }
+
+/* ---------- phone ---------- */
+.phone {
+  min-height: 100%; max-width: 34rem; margin: 0 auto;
+  display: flex; flex-direction: column;
+  padding: max(0.75rem, env(safe-area-inset-top)) 1rem max(0.75rem, env(safe-area-inset-bottom));
+  font-size: 1.05rem; line-height: 1.4;
+}
+.phone main { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 1rem 0; }
+.phone-header { display: flex; align-items: center; gap: 0.75rem; min-height: 48px; }
+.nick { display: flex; flex-direction: column; line-height: 1.15; flex: 1; min-width: 0; }
+.nick strong { font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reroll {
+  width: 48px; height: 48px; flex: none; font-size: 1.5rem; line-height: 1;
+  background: none; color: var(--ink); border: 2px solid var(--line); border-radius: 50%; cursor: pointer;
+  touch-action: manipulation;
+}
+.phone-footer { font-size: 0.8rem; color: var(--ink-2); text-align: center; }
+.phone-footer p { margin: 0.25rem 0; }
+.offline { color: var(--bad); font-weight: 600; }
+
+.card { display: flex; flex-direction: column; gap: 0.75rem; }
+.card > p { margin: 0; }
+.question { font-size: 1.3rem; line-height: 1.35; font-weight: 500; }
+.two-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.two-buttons .btn { min-height: 88px; font-size: 1.3rem; }
+.options { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.guess-input, .code-input {
+  font: inherit; font-size: 1.5rem; font-weight: 700; text-align: center; /* 16px or more: iOS does not zoom */
+  width: 7ch; min-height: 52px; margin: 0.25rem 0.4rem; padding: 0.25rem;
+  color: var(--ink); background: var(--card); border: 2px solid var(--ink); border-radius: 10px;
+}
+.code-input { display: block; width: 8ch; margin: 0.75rem auto; letter-spacing: 0.2em; text-transform: uppercase; }
+.echo { min-height: 1.4em; }
+.error { color: var(--bad); font-weight: 600; min-height: 1.4em; }
+
+.status { font-size: 1.3rem; font-weight: 700; }
+.status.ok { color: var(--good); }
+.status.late { color: var(--bad); }
+.big-value { font-size: 3rem; font-weight: 800; line-height: 1; }
+
+.waiting { text-align: center; }
+.waiting .eyes { font-size: 3rem; line-height: 1; color: var(--ink-2); }
+.badge {
+  display: inline-block; align-self: center; padding: 0.35rem 0.9rem;
+  border: 2px solid var(--ink); border-radius: 999px; font-weight: 700;
+}
+.quote { font-size: 1.1rem; padding: 0.75rem; border-left: 4px solid var(--line); text-align: left; }
+.reveal-text { font-size: 1.15rem; padding: 0.9rem; background: var(--card); border: 2px solid var(--ink); border-radius: var(--radius); }
+
+.result { font-size: 1.8rem; font-weight: 800; }
+.result.right { color: var(--good); }
+.result.wrong, .result.none { color: var(--ink-2); }
+.standing { margin-top: 0.5rem; padding: 0.9rem; text-align: center; background: var(--card); border: 2px solid var(--line); border-radius: var(--radius); }
+.standing p { margin: 0; }
+.standing .gain { font-size: 1.6rem; font-weight: 800; color: var(--good); }
+.standing .points { font-size: 1.3rem; font-weight: 700; }
+
+.countdown { font-variant-numeric: tabular-nums; font-weight: 800; }
+.phone .countdown {
+  min-width: 3ch; padding: 0.3rem 0.6rem; text-align: center; font-size: 1.3rem;
+  border: 2px solid var(--ink); border-radius: 10px;
+}
+.countdown.low { color: var(--bad); border-color: var(--bad); }
+.countdown:empty { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .status.pending { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.45; } }
+}
