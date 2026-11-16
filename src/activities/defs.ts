@@ -4,7 +4,7 @@
 // (session compiler, stage controller, phone client, rules) does not change, unless
 // the new type needs a new kind of answer.
 
-import type { ActivityDef } from '../core/types';
+import type { ActivityDef, PhoneView } from '../core/types';
 import { guessDef } from './guess/def';
 import { choiceDef } from './choice/def';
 import { promptDef } from './prompt/def';
@@ -18,6 +18,12 @@ export const defs: Record<string, ActivityDef> = {
   podium: podiumDef,
   end: endDef,
 };
+
+/** Views on which a phone shows points or a rank and therefore reads the leaderboard document. */
+export function needsBoard(view: PhoneView): boolean {
+  if (view.type === 'podium' || view.type === 'end') return true;
+  return view.type === 'choice' && view.scored === true && (view.phase === 'reveal' || view.phase === 'leaderboard');
+}
 
 /** Types that may be used in steps without being declared under "activities". */
 export const BUILT_IN = ['lobby', 'podium', 'end'];
