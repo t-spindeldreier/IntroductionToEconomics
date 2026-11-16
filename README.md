@@ -1,0 +1,370 @@
+# Econ Live
+
+A small web app for running interactive activities with a lecture hall of students on
+their own phones. Students scan one QR code; there is no account, no install and no
+typing of names. A "stage" page on the tutor's laptop is projected, drives the session
+with the arrow keys and shows results live.
+
+The app is an engine plus session files. A session (questions, quiz, prompts, order of
+steps) is one YAML file; adding a session means writing a file, not code.
+
+- Static site on GitHub Pages, Cloud Firestore as the only backend, free plans only.
+- No student accounts, no names, no analytics, no requests to anyone but Firebase.
+
+## Contents
+
+1. [Try it on your laptop](#try-it-on-your-laptop)
+2. [One-time setup](#one-time-setup)
+3. [How to run a session](#how-to-run-a-session)
+4. [How to write a session file](#how-to-write-a-session-file)
+5. [Export and delete data](#export-and-delete-data)
+6. [How it works](#how-it-works)
+7. [Tests](#tests)
+8. [Manual test with two phones](#manual-test-with-two-phones)
+9. [Known limits](#known-limits)
+10. [Later](#later)
+
+## Try it on your laptop
+
+You need Node 22 or newer and a Java runtime, version 21 or newer, for the Firestore
+emulator (`java -version`). If your Java is older, install a private one that only this
+project uses: `conda create -p .tools/jdk -c conda-forge openjdk=21`. The npm scripts
+find it there by themselves.
+
+```
+npm install
+npm run emulators      # terminal 1: local Firestore and Auth, nothing touches the cloud
+npm run dev            # terminal 2: the site at http://localhost:5173
+```
+
+Open `http://localhost:5173/#/stage`, click "Emulator only: sign in as a test host",
+then "Emulator only: put me on the host list", then "Load the demo session" and "Create
+room". Open the join link in a second window. In the stage window press H and add
+simulated students, then walk through the session with the right-arrow key.
+
+To join from a real phone, connect it to the same Wi-Fi and open
+`http://<your laptop's IP address>:5173/?r=<CODE>`.
+
+## One-time setup
+
+**1. GitHub.** Create a public repository and push this folder to it. In the repository
+go to Settings, Pages, and set Source to "GitHub Actions". Every push to `main` then
+builds and publishes the site at `https://<user>.github.io/<repo>/`.
+
+**2. Firebase console** (console.firebase.google.com).
+
+1. Add project. Switch Google Analytics off.
+2. Build, Firestore Database, Create database. Choose an EU location such as
+   `eur3 (Europe)` or `europe-west3 (Frankfurt)`. It cannot be changed later. Start in
+   production mode.
+3. Build, Authentication, Get started, Sign-in method: enable Google. Then Settings,
+   Authorized domains: add `<user>.github.io`.
+4. Project settings (the gear), Your apps, the `</>` icon: register a web app (no
+   hosting). Copy the `firebaseConfig` values into `src/firebase-config.ts`.
+
+   These values are not secrets. Every Firebase web app sends them to every visitor;
+   they only name the project. The security rules protect the data. Committing the file
+   to a public repository is fine and intended.
+
+**3. Deploy the security rules.**
+
+```
+npx firebase login
+npx firebase use --add          # pick your project, alias "default"
+npm run deploy:rules
+```
+
+Run the last command again whenever `firestore.rules` changes.
+
+**4. Make yourself a host.** Push, wait for the deployment, open
+`https://<user>.github.io/<repo>/#/stage` and sign in with Google. The page says that
+the account is not on the host list and shows a user id. In the Firebase console,
+Firestore, Start collection: collection id `config`, document id `hosts`, one field
+`uids` of type array, with that user id as a string element. Reload the stage page.
+The allowlist lives only in the database, so no email address is in the repository.
+
+## How to run a session
+
+1. The day before: open the stage, "Load a session file…", pick the YAML file, "Create room".
+2. Rehearse: press H, add 30 simulated students, step through everything with →.
+3. Still in the H panel: "Remove simulated students", then "Jump here" on the first step.
+   (Or simply create a fresh room for class.)
+4. In class: open the stage, "Open stage" on the room, press F for full screen.
+5. Students scan the QR code. The count of joined students is on the screen.
+6. → (or Space) always does the next sensible thing. The corner says what that is ("next: reveal").
+7. ← goes back one state. J shows the join code for latecomers.
+8. T starts or pauses a countdown. + adds 30 seconds (also to a running quiz question).
+9. H opens the step list to skip or jump. The audience sees it; it shows no answers.
+10. Afterwards: H, "Download CSV files", then "Close room" or "Delete all data of this room".
+
+A room accepts answers for six hours after it was created and then closes by itself.
+"Reopen room" in the H panel gives it six more hours.
+
+If the stage is reloaded, or the laptop restarts, open the same room again: it resumes
+on the same step. Students whose phones reload, sleep or change network come back with
+the same nickname, group and score.
+
+## How to write a session file
+
+Start from `sessions/demo.yaml`. A file has a title, activities, and steps:
+
+```yaml
+title: "Week 3: Health"
+
+activities:
+  my-quiz:            # the id: lowercase letters, digits and hyphens
+    type: choice
+    ...
+
+steps:                # the order in class
+  - lobby
+  - my-quiz
+  - end
+```
+
+The stage validates a file when you load it and lists every problem with its place
+(for example `activities.quiz.items[3].correct: "H" is not one of the options`).
+Nothing is uploaded until the file is flawless.
+
+**Never commit real session files: the repository is public and they contain the
+answers.** Keep them in `sessions/private/`, which git ignores. The files reach the
+database only through the stage page and are readable by hosts only.
+
+### Activity types
+
+**guess**: a numeric guess, optionally with hidden versions ("arms").
+
+| field | meaning |
+| --- | --- |
+| `stageText` | the neutral question on the projector while answers come in |
+| `stageHint` | second line; default "Answer on your phone. Keep your screen to yourself." |
+| `part1`, `part1Options` | optional first question with two buttons; `{anchor}` is replaced by the arm's anchor, `**bold**` works |
+| `part2` | the guess prompt; `___` marks where the input field goes |
+| `arms` | list of `{ label, anchor }`. Leave it out for a plain numeric poll |
+| `min`, `max`, `exclusiveMin` | allowed range; `exclusiveMin: true` means "greater than min" |
+| `axis` | `{ min, max }` of the log-scale dot plot; default 1 to 10000 |
+| `revealHeadline` | headline when the versions are revealed |
+| `truth` | optional `{ value, label }` |
+
+Phases: `open`, `closed`, `versions` (with two or more arms), `results`, `truth`.
+Each phone gets its arm by a hash of its random id and the activity id. That is as good
+as a coin flip, and neither the student nor the tutor can influence it.
+
+**choice**: a question with 2 to 8 options, one or many items.
+
+| field | meaning |
+| --- | --- |
+| `question` | line shown with every item |
+| `options` | options shared by all items; an item may have its own `options` |
+| `timed` | seconds per item; leave out for untimed |
+| `scored` | `true` for points and a leaderboard; every item then needs `correct` |
+| `items` | list of `{ text, correct, explanation, source, options }` |
+
+`correct` is the option number (1 is the first), its letter, or its exact text.
+Phases per item: `open`, `closed`, `reveal`, `leaderboard` (scored only). By default
+`closed` is skipped, so one press opens and the next reveals.
+Scoring: 500 points for a correct answer plus up to 500 for speed, in proportion to
+the time left. Ties are broken by the lower total response time.
+
+**prompt**: a text on stage and phones.
+
+| field | meaning |
+| --- | --- |
+| `text` | the prompt |
+| `timer` | countdown in seconds; `autostart: false` if it should wait for T |
+| `reveal` | hidden second text (a model answer, the real study), shown by the next press |
+
+**lobby**, **podium**, **end** need no declaration; just use them in `steps`.
+
+### Steps
+
+A step is an activity id, or an object when you want less or more than the default:
+
+```yaml
+steps:
+  - { activity: lobby, collect: anchor }     # lobby while a guess is open for answers
+  - { activity: anchor, phases: [closed] }   # close it
+  - rf                                       # all items, default phases
+  - { activity: anchor, phases: [versions, results, truth] }   # reveal it later
+  - { activity: quiz, items: [1, 2, 3] }     # only some items
+  - podium
+  - end
+```
+
+The same activity can appear in several steps, which is how collecting and revealing
+are separated.
+
+## Export and delete data
+
+H, "Download CSV files" saves two files (the browser may ask once whether the site may
+download several files):
+
+- `<CODE>_responses.csv`: `room, step, activity, item, participant_id, arm, answer,
+  answer_label, part1, correct, response_ms, server_time, simulated`
+- `<CODE>_participants.csv`: `room, participant_id, nickname, arm_<activity>, joined_at,
+  simulated`
+
+They are plain UTF-8, comma separated, with ISO timestamps in UTC. For choice questions
+`answer` is the option number starting at 1. Simulated students are left out unless you
+tick the box.
+
+```stata
+import delimited "ABCD_responses.csv", encoding(utf-8) clear
+```
+```r
+d <- read.csv("ABCD_responses.csv")
+```
+```python
+d = pandas.read_csv("ABCD_responses.csv")
+```
+
+`participant_id` is a random pseudonym that exists only for one room. It cannot be
+linked to a person, a device or another week.
+
+H, "Delete all data of this room" removes all answers, participants, results and the
+room. It asks you to type the room code first.
+
+## How it works
+
+```
+src/core/         pure logic, unit-tested: ids, nicknames, medians, scoring, session compiler, CSV
+src/activities/   one folder per activity type: def.ts (logic), phone.ts, stage.ts
+src/data/         the only code that talks to Firestore: phoneClient.ts, hostClient.ts
+src/phone/        the student page          src/stage/   the host pages (loaded only on #/stage)
+src/strings.ts    every piece of interface text (copy it for a German version)
+firestore.rules   the security rules        tests/rules/ a test for each guarantee
+sessions/         demo.yaml (public)        sessions/private/ your real files (git-ignored)
+```
+
+**Frames.** A session file is compiled into a flat list of frames. One press of → moves
+the room from one frame to the next, with one write to the room document. Left goes
+back one frame.
+
+**Documents.**
+
+| document | content | who reads it |
+| --- | --- | --- |
+| `rooms/{code}` | current frame, what phones show, what is open for answers, timer | everyone who knows the code |
+| `rooms/{code}/participants/{secret}` | public id, nickname as two list positions, join time | its owner, hosts |
+| `rooms/{code}/responses/{key}_{secret}` | public id, answer, server time; create-only | its owner, hosts |
+| `rooms/{code}/results/{key}` | aggregates and leaderboard, written at reveal time | everyone, after the reveal |
+| `sessions/{id}` | the session file with all answers | hosts |
+| `config/hosts` | allowlist of host user ids | hosts |
+
+**Reads.** A phone listens to exactly one document (the room) and reads the leaderboard
+document once per scored reveal. It never queries a collection. Only the stage reads
+answers, and it computes all aggregates.
+
+**Student identity.** There is no Firebase Authentication for students, because Firebase
+allows only 100 new accounts per hour from one IP address and the lecture hall shares
+one. A phone generates a random 32-character secret and keeps it in localStorage. The
+secret is part of the ids of the documents the phone writes. The public id is the start
+of the secret's SHA-256 hash, and the rules recompute it, so nobody can answer under
+another student's id.
+
+**Nicknames** are stored as two numbers (adjective, economist), never as text. Nothing a
+student types can reach the projector. If you edit the lists in `src/core/nicknames.ts`,
+update the two numbers at the top of `firestore.rules`; a unit test reminds you.
+
+**Time.** Opening times and answer times are server timestamps. The rules reject answers
+after the closing time. Phones only use their own clock to draw the countdown, corrected
+by the server time of the latest room update.
+
+**Adding an activity type.** Write `def.ts`, `phone.ts` and `stage.ts` in a new folder
+under `src/activities/` and register them in `defs.ts`, `phoneViews.ts` and
+`stageViews.ts`. The engine does not change as long as the answer is a number or an
+option; a new kind of answer also needs a new block in `firestore.rules`.
+
+## Tests
+
+```
+npm test              # unit tests: medians, scoring, session validation, CSV
+npm run test:rules    # security rules on the emulator, one block per guarantee
+npm run simulate      # 100 phones and a stage through the whole session; checks the budget
+npm run smoke         # real browser: one stage, three phones, screenshots in smoke-shots/
+npm run build         # type check, build, report the gzipped phone download
+```
+
+`npm run simulate` uses the real client code and the real SDK against the emulator. It
+fails if a 100-student session needs more than 15,000 reads or 3,000 writes. The free
+daily quota is 50,000 reads and 20,000 writes, so a rehearsal on the same day still
+fits. Use `npm run simulate -- sessions/demo.yaml 150` for another file or class size.
+
+## Manual test with two phones
+
+Automated tests ran in Chromium only. **iOS Safari has not been tested by anyone but
+you.** Ten minutes, two phones (ideally one iPhone, one Android), one laptop, on the
+deployed site, with the demo session:
+
+1. Laptop: open the stage, create a room from the demo session, press F.
+2. Both phones: scan the QR code with the camera. Each should show a nickname and the
+   more/fewer question within a few seconds. No zooming, no sideways scrolling.
+3. Phone A: tap the round arrow. The nickname changes.
+4. Compare the two phones: do they show different numbers in the question? (With two
+   phones there is a 50% chance they match. Open a private tab to get another draw.)
+5. Phone A: answer, type a guess with a comma ("80,5"). The numeric keypad should
+   appear and the page must not zoom. Tap Send twice quickly. It should say "Received"
+   once, and the stage count should go up by one.
+6. Phone B: lock the screen for 30 seconds, unlock. The question should still be there.
+   Answer.
+7. Phone A: reload the page. Same nickname, still "Received".
+8. Laptop: →. Both phones show "Look at the screen".
+9. Laptop: → to open the true/false question. Phone B: switch to flight mode, tap an
+   answer (it should say "Sending…"), switch flight mode off. It should turn to
+   "Received" by itself.
+10. Laptop: → to reveal. Phones show whether they were right.
+11. Laptop: reload the stage page in the middle. It must come back on the same step.
+12. Laptop: → through the three reveal steps of the guess. Check the plot from the back
+    of the room. Phones show which version they had.
+13. Laptop: → to the timed quiz. Phones show a countdown that matches the stage within
+    about a second. Answer on phone A only; let the time run out on phone B. Phone B
+    should say "Time is up".
+14. Laptop: → to reveal. Phone A shows points and rank, phone B "No answer".
+15. Laptop: → to the end. Then H, download the CSV files and open one. Then delete the
+    room. The phones show "This room does not exist".
+
+Things to watch on iOS in particular: the keypad type in step 5, coming back from the
+lock screen in step 6, flight mode in step 9, and private browsing (the identity then
+lasts only until the tab is closed).
+
+## Known limits
+
+- **Residual risk.** There is no server, so the rules are the only protection. A
+  determined student with a script could create many fake participants or flood the
+  database with requests during class and exhaust the free daily quota, which would stop
+  the session for that day; they cannot read others' answers, see correct answers early,
+  or change anything already written.
+- A student who opens developer tools can see both versions of the guess question in
+  the room document while it is open. This was accepted in the design.
+- A student who clears the browser data or uses a second browser is a new participant
+  (new nickname, possibly the other version of the guess).
+- Two students can get the same nickname. There are 3,072 combinations.
+- An answer that is sent in the last instant before a reveal can miss the bars on the
+  stage for a moment. The stage corrects the published numbers 1.5 seconds later, and
+  scores are recomputed from all answers at every reveal.
+- Going back (←) into a question re-opens it. Students who had already answered stay
+  locked; the others can still answer.
+- The phone countdown relies on the phone's clock until the first live update arrives
+  after a page load, so it can be off by a second or two on a phone whose clock is
+  wrong. Scoring and closing use server time only and are not affected.
+- The stage loads all answers of the room when it opens (up to about 1,500 reads for a
+  full session of 100). A few reloads are fine; twenty in one day would be noticeable
+  in the quota.
+- One stage per room. Opening the same room on two laptops and pressing keys on both is
+  not supported.
+- The local emulator slows down when a hundred answers arrive within two or three
+  seconds; `npm run simulate` therefore spreads answers over five seconds per question.
+  The real Firestore has no such limit at this scale.
+
+## Later
+
+Ideas that were deliberately not built:
+
+- More activity types: "guess two thirds of the average", belief elicitation with a
+  reveal of true values, a simple market or public-goods game.
+- A German version (copy `src/strings.ts`).
+- Showing last week's class data inside the app instead of in slides.
+- Firebase App Check to make scripted abuse harder.
+- A zip file instead of two CSV downloads.
+- An exactly balanced split between arms instead of independent coin flips.
+- A dark theme for the stage.
