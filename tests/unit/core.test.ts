@@ -128,7 +128,7 @@ describe('session files', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (!r.ok) return;
     const { session } = r;
-    expect(session.frames.length).toBe(59);
+    expect(session.frames.length).toBe(60);
     expect(session.sections.length).toBe(5);
     expect(session.frames[0].section).toBe(-1);
     expect(session.frames.at(-1)!.section).toBe(4);

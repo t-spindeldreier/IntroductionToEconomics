@@ -57,6 +57,22 @@ export const podiumDef: ActivityDef = {
   }),
 };
 
+/** Picture: one figure filling the projector (an opening slide, a cartoon). Phones show nothing of it. */
+export const pictureDef: ActivityDef = {
+  type: 'picture',
+  validate(a, v) {
+    v.only(a, ['type', 'id', 'image', 'label']);
+    v.text(a, 'image', { required: true, max: 120 });
+    v.text(a, 'label', { max: 60 });
+  },
+  itemCount: () => 0,
+  phases: () => ['show'],
+  defaultPhases: () => ['show'],
+  phaseLabel: () => S.phase.show,
+  stepLabel: (a) => `${S.step.picture}: ${a.label ?? a.image}`,
+  enter: () => ({ view: { type: 'picture' } }),
+};
+
 /** End: thank-you screen; phones show the final rank. */
 export const endDef: ActivityDef = {
   type: 'end',

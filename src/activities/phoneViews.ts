@@ -5,7 +5,7 @@ import { guessPhone } from './guess/phone';
 import { choicePhone } from './choice/phone';
 import { promptPhone } from './prompt/phone';
 import { tablePhone } from './table/phone';
-import { endPhone, lobbyPhone, podiumPhone, sectionPhone } from './simple/phone';
+import { endPhone, lobbyPhone, picturePhone, podiumPhone, sectionPhone } from './simple/phone';
 
 export const phoneViews: Record<string, PhoneViewFn> = {
   lobby: lobbyPhone,
@@ -13,6 +13,7 @@ export const phoneViews: Record<string, PhoneViewFn> = {
   choice: choicePhone,
   prompt: promptPhone,
   table: tablePhone,
+  picture: picturePhone,
   podium: podiumPhone,
   section: sectionPhone,
   end: endPhone,

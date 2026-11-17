@@ -255,6 +255,10 @@ line, medians of all students below and above) and `band` (the students closest 
 bar on each side, about a third of each side, the jump between their medians, and the
 `takeaway`). The study slides and the exam bank contain the same plot and numbers.
 
+**Picture.** `type: picture` with `image: file.jpg` shows one figure as large as the
+projector allows, for example as the opening slide before the lobby. Select the image
+file together with the session file, as for other figures.
+
 **Table.** `type: table` shows a comparison table on the projector (phones only show
 its title) and in the study slides: `title`, `columns` (2 to 5 headings), `rows` (2 to 8
 lists with one text per column), optional `note`, and `stepwise: true` for one key press

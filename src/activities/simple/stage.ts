@@ -56,5 +56,12 @@ export const podiumStage: StageViewFn = (env) => {
     h('div', { class: 'podium' }, place(2), place(1), place(3)));
 };
 
+/** Picture: the figure as large as the screen allows. */
+export const pictureStage: StageViewFn = (env) => {
+  const src = env.session.images[env.activity.image];
+  return h('div', { class: 'view picture-view' },
+    src && src.startsWith('data:image/') ? h('img', { src, alt: env.activity.label ?? '' }) : null);
+};
+
 export const endStage: StageViewFn = (env) =>
   h('div', { class: 'view centered end-view' }, h('h1', { class: 'section-title' }, env.activity.text ?? S.thanks));

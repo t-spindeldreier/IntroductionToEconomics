@@ -48,7 +48,7 @@ try {
   await Promise.race([stage.getByText('Session uploaded.').waitFor(), stage.locator('.errors').waitFor()]);
   if (await stage.locator('.errors').count()) throw new Error('The session file has problems:\n' + (await stage.locator('.errors').innerText()));
   await stage.getByRole('button', { name: 'Create room' }).first().click();
-  await stage.waitForSelector('.join-code');
+  await stage.waitForSelector('.next-hint');
 
   await stage.keyboard.press('h');
   await stage.fill('.count-input', String(students));

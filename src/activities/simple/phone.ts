@@ -13,6 +13,8 @@ export const sectionPhone: PhoneViewFn = (view) =>
     h('h1', null, String(view.title)),
     h('p', { class: 'muted' }, S.lookAtScreen));
 
+export const picturePhone: PhoneViewFn = () => waiting();
+
 export const podiumPhone: PhoneViewFn = (_view, env) =>
   waiting(env.client.board ? h('p', { class: 'muted' }, S.finalRank) : null, ownStanding(env, false));
 

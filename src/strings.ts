@@ -150,6 +150,7 @@ export const S = {
     question: 'Question',
     prompt: 'Prompt',
     table: 'Table',
+    picture: 'Picture',
   },
 
   // host panel

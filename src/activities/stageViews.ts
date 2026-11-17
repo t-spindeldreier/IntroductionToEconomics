@@ -5,7 +5,7 @@ import { guessStage } from './guess/stage';
 import { choiceStage } from './choice/stage';
 import { promptStage } from './prompt/stage';
 import { tableStage } from './table/stage';
-import { endStage, lobbyStage, podiumStage, sectionStage } from './simple/stage';
+import { endStage, lobbyStage, pictureStage, podiumStage, sectionStage } from './simple/stage';
 
 export const stageViews: Record<string, StageViewFn> = {
   lobby: lobbyStage,
@@ -13,6 +13,7 @@ export const stageViews: Record<string, StageViewFn> = {
   choice: choiceStage,
   prompt: promptStage,
   table: tableStage,
+  picture: pictureStage,
   podium: podiumStage,
   section: sectionStage,
   end: endStage,
