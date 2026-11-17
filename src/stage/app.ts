@@ -13,7 +13,7 @@ import { h, replaceContent } from '../ui/dom';
 import { app, db, USE_EMULATOR } from '../data/firebase';
 import { compileSession, nextLabel } from '../core/session';
 import { msLeft } from '../core/timer';
-import { studySlidesHtml } from '../core/handout';
+import { examBankHtml, studySlidesHtml } from '../core/handout';
 import { ROOM_CODE_PATTERN } from '../core/identity';
 import {
   createRoom, deleteSession, listRooms, listSessions, loadSession, StageController, uploadSession,
@@ -111,10 +111,15 @@ async function home(message: string | null = null, errors: string[] = []): Promi
   const date = (ms: number) => new Date(ms).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 
   const fileInput = h('input', {
-    type: 'file', accept: '.yaml,.yml,.json', class: 'visually-hidden', id: 'session-file',
+    type: 'file', accept: '.yaml,.yml,.json,image/*', multiple: true, class: 'visually-hidden', id: 'session-file',
     onchange: async () => {
-      const file = fileInput.files?.[0];
-      if (file) await addSession(await file.text());
+      // One session file, plus any figures it refers to, selected together.
+      const files = [...(fileInput.files ?? [])];
+      const sessionFile = files.find((f) => /\.(ya?ml|json)$/i.test(f.name));
+      if (!sessionFile) return home(null, ['Select a .yaml or .json session file (and its figures, if any).']);
+      const images = new Map<string, string>();
+      for (const f of files) if (f !== sessionFile) images.set(f.name.toLowerCase(), await readAsDataUrl(f));
+      await addSession(await sessionFile.text(), images);
     },
   }) as HTMLInputElement;
 
@@ -146,7 +151,34 @@ async function home(message: string | null = null, errors: string[] = []): Promi
 }
 
 /** Validate a session file; upload it only if it is flawless. */
-async function addSession(text: string): Promise<void> {
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Put the figures the session refers to into the session itself, so it is one document. */
+function embedImages(raw: any, images: Map<string, string>): string[] {
+  const errors: string[] = [];
+  if (typeof raw !== 'object' || raw === null) return errors;
+  raw.images = {};
+  for (const a of Object.values<any>(raw.activities ?? {})) {
+    for (const field of ['image', 'revealImage']) {
+      const name = a?.[field];
+      if (typeof name !== 'string') continue;
+      const data = images.get(name.split(/[\\/]/).pop()!.toLowerCase());
+      if (data) raw.images[name] = data; // stored once, even if shown twice
+      else errors.push(S.imageMissing(name));
+    }
+  }
+  if (errors.length === 0 && JSON.stringify(raw).length > 900_000) errors.push(S.sessionTooBig);
+  return errors;
+}
+
+async function addSession(text: string, images = new Map<string, string>()): Promise<void> {
   let raw: unknown;
   try {
     const { parse } = await import('yaml'); // YAML is a superset of JSON, so this reads both
@@ -154,6 +186,8 @@ async function addSession(text: string): Promise<void> {
   } catch (e) {
     return home(null, [`The file is not valid YAML or JSON: ${e instanceof Error ? e.message : e}`]);
   }
+  const imageErrors = embedImages(raw, images);
+  if (imageErrors.length) return home(null, imageErrors);
   const result = compileSession(raw);
   if (!result.ok) return home(null, result.errors);
   await uploadSession(db, user!.uid, result.session.title, raw);
@@ -286,6 +320,9 @@ async function openRoom(code: string): Promise<void> {
             h('button', { class: 'btn small-btn', title: S.studyNote, onclick: () =>
               download(`${room.code}_study_slides.html`, studySlidesHtml(ctl.session, ctl.live, room.code), 'text/html') }, S.studySlides),
             h('p', { class: 'muted small' }, S.studyNote),
+            h('button', { class: 'btn small-btn', title: S.examBankNote, onclick: () =>
+              download(`${room.code}_exam_bank.html`, examBankHtml(ctl.session, ctl.live, room.code), 'text/html') }, S.examBank),
+            h('p', { class: 'muted small' }, S.examBankNote),
             room.status === 'open'
               ? h('button', { class: 'btn small-btn', onclick: () => void run(S.working, () => ctl.closeRoom()) }, S.closeRoom)
               : h('button', { class: 'btn small-btn', onclick: () => void run(S.working, () => ctl.reopenRoom()) }, S.reopenRoom),

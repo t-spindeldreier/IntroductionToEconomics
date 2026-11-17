@@ -118,6 +118,26 @@
 .answer-text { font-size: 2.3vw; line-height: 1.35; }
 .prompt-before { font-size: 1.9vw; max-width: 85vw; }
 
+.answer-card.compact { padding: 1vw 1.6vw; }
+.answer-card.compact .answer-text { font-size: 2vw; }
+
+/* ---------- figures ---------- */
+.view.with-figure { justify-content: flex-start; }
+.figure { flex: 1; min-height: 0; max-width: 100%; object-fit: contain; object-position: left top; }
+.figure-row { flex: 1; min-height: 0; display: flex; gap: 2.5vw; align-items: flex-start; }
+.figure-row .answer-card { flex: 1; }
+.figure-row .figure { flex: 1.2; max-height: 100%; }
+.with-figure .answer-text { font-size: 1.9vw; }
+
+/* ---------- balance check ---------- */
+.split { display: flex; flex-direction: column; gap: 1.6vw; }
+.split-row { display: grid; grid-template-columns: 22vw 1fr; align-items: center; gap: 2vw; }
+.split-option { font-size: 2.4vw; font-weight: 700; }
+.split-bars { display: flex; flex-direction: column; gap: 0.5vw; }
+.split-bar { display: flex; align-items: center; gap: 1vw; }
+.split-arm { flex: none; width: 9vw; font-size: 1.5vw; color: var(--ink-2); }
+.split-bar .bar-fill { height: 2.4vw; }
+
 /* ---------- guess reveal ---------- */
 .swatch { display: inline-block; width: 1.4vw; height: 1.4vw; border-radius: 50%; margin-right: 0.7vw; vertical-align: baseline; }
 .versions { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; flex: 1; align-items: stretch; }
@@ -129,7 +149,8 @@
 .medians { display: flex; gap: 3vw; }
 .median-card { flex: 1; }
 .median-value { font-size: 6.5vw; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-.dotplot { width: 100%; height: auto; max-height: 46vh; }
+.dotplot { width: 100%; height: auto; max-height: 44vh; }
+.view > .kicker { font-size: 1.7vw; }
 .plot-note { font-size: 1.7vw; }
 
 /* ---------- choice ---------- */

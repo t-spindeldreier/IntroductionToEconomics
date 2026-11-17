@@ -13,6 +13,7 @@ const GRID = '#d9dbe0';
 
 export interface DotRow {
   label: string;
+  title?: string;
   values: number[];
   median: number | null;
 }
@@ -21,18 +22,35 @@ export interface DotRow {
  * One row of dots per arm on a shared log axis. Values outside the axis are
  * pinned to its edge. Dots that would overlap are stacked.
  */
-export function dotPlot(rows: DotRow[], axis: { min: number; max: number },
+export function dotPlot(rows: DotRow[], axis: { min: number; max: number; scale?: string },
   truth: { value: number; label: string } | null): SVGElement {
-  const W = 1600, left = 40, right = 40, rowH = 190, top = truth ? 70 : 30, axisH = 70;
+  const W = 1600, left = 40, right = 40, rowH = rows.length >= 3 ? 140 : 190, top = truth ? 70 : 30, axisH = 70;
   const plotW = W - left - right;
   const H = top + rows.length * rowH + axisH;
-  const x = (v: number) => left + logPosition(v, axis.min, axis.max) * plotW;
+  const linear = axis.scale === 'linear';
+  const position = (v: number) => (linear
+    ? Math.min(1, Math.max(0, (v - axis.min) / (axis.max - axis.min)))
+    : logPosition(v, axis.min, axis.max));
+  const x = (v: number) => left + position(v) * plotW;
+  const name = (r: DotRow) => r.title ?? r.label;
   const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'dotplot', role: 'img',
-    'aria-label': rows.map((r) => `${r.label}: median ${r.median === null ? 'none' : formatNumber(r.median)}`).join('; ') });
+    'aria-label': rows.map((r) => `${name(r)}: median ${r.median === null ? 'none' : formatNumber(r.median)}`).join('; ') });
 
-  // Axis: a tick at every power of ten.
-  for (let p = Math.ceil(Math.log10(axis.min)); p <= Math.floor(Math.log10(axis.max)); p++) {
-    const v = 10 ** p;
+  // Axis ticks. Linear: five even steps. Log: every power of ten, plus 2 and 5
+  // times each when the axis spans less than three powers of ten.
+  const ticks: number[] = [];
+  if (linear) {
+    for (let i = 0; i <= 5; i++) ticks.push(axis.min + ((axis.max - axis.min) * i) / 5);
+  } else {
+    const dense = Math.log10(axis.max / axis.min) < 3;
+    for (let p = Math.floor(Math.log10(axis.min)); p <= Math.ceil(Math.log10(axis.max)); p++) {
+      for (const m of dense ? [1, 2, 5] : [1]) {
+        const v = m * 10 ** p;
+        if (v >= axis.min * 0.999 && v <= axis.max * 1.001) ticks.push(v);
+      }
+    }
+  }
+  for (const v of ticks) {
     root.append(
       svg('line', { x1: x(v), x2: x(v), y1: top, y2: top + rows.length * rowH, stroke: GRID, 'stroke-width': 2 }),
       svg('text', { x: x(v), y: H - 22, 'text-anchor': 'middle', 'font-size': 34, fill: INK }, formatNumber(v)),
@@ -53,7 +71,7 @@ export function dotPlot(rows: DotRow[], axis: { min: number; max: number },
       const maxOffset = rowH / 2 - r - 6;
       const dot = svg('circle', { cx: slot * r * 2, cy: cy + Math.max(-maxOffset, Math.min(maxOffset, offset)),
         r, fill: colour, stroke: '#fff', 'stroke-width': 2 });
-      dot.append(svg('title', {}, `${row.label}: ${formatNumber(v)}`));
+      dot.append(svg('title', {}, `${name(row)}: ${formatNumber(v)}`));
       root.append(dot);
     }
     // Median marker: a vertical bar in ink with its value.

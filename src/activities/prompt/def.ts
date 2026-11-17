@@ -2,14 +2,19 @@
 // hidden second text that the tutor reveals (a model answer, the real study).
 //
 // Session file fields:
-//   text       the prompt
-//   timer      seconds; leave out for no countdown
-//   autostart  start the countdown as soon as the prompt appears (default true)
-//   reveal     hidden text, shown in a second phase
-//   label      optional short name for the host's step list
-//   mode       how students work on it, shown as a label on stage and phones:
-//              pair, group, discuss, paper or think
+//   text         the prompt
+//   timer        seconds; leave out for no countdown
+//   autostart    start the countdown as soon as the prompt appears (default true)
+//   reveal       hidden text, shown in a second phase
 //   revealTitle  heading of the hidden text (default "Answer")
+//   label        optional short name for the host's step list
+//   mode         how students work on it, shown as a label on stage and phones:
+//                pair, group, discuss, paper or think
+//   image        file name of a figure shown with the prompt (projector only)
+//   revealImage  file name of a figure shown with the hidden text (projector only)
+//
+// Figures: select the image files together with the session file when loading it.
+// They are stored inside the session (hosts only) and never sent to phones.
 
 import { S } from '../../strings';
 import type { ActivityDef, EnterContext, FramePatch } from '../../core/types';
@@ -19,12 +24,15 @@ export const promptDef: ActivityDef = {
   type: 'prompt',
 
   validate(a, v) {
-    v.only(a, ['type', 'id', 'text', 'timer', 'autostart', 'reveal', 'label', 'mode', 'revealTitle']);
+    v.only(a, ['type', 'id', 'text', 'timer', 'autostart', 'reveal', 'label', 'mode', 'revealTitle', 'image', 'revealImage']);
     if (a.mode !== undefined && !(a.mode in S.mode)) v.at('mode').err(`must be one of: ${Object.keys(S.mode).join(', ')}`);
     v.text(a, 'revealTitle', { max: 60 });
     v.text(a, 'text', { required: true, max: 700 });
     v.text(a, 'reveal', { max: 900 });
     v.text(a, 'label', { max: 60 });
+    v.text(a, 'image', { max: 120 });
+    v.text(a, 'revealImage', { max: 120 });
+    if (a.revealImage && !a.reveal) v.at('revealImage').err('needs a "reveal" text as well');
     v.number(a, 'timer', { min: 5, max: 3600 });
     v.bool(a, 'autostart');
     a.autostart ??= true;
@@ -38,6 +46,7 @@ export const promptDef: ActivityDef = {
   phaseLabel: (_a, phase) => (phase === 'reveal' ? S.phase.reveal : S.phase.show),
   stepLabel: (a) => `${S.step.prompt}: ${a.label ?? shorten(a.text, 44)}`,
 
+  // The view for phones carries the texts only, never the figures.
   enter({ activity: a, frame }: EnterContext): FramePatch {
     if (frame.phase === 'reveal') {
       return { view: { type: 'prompt', key: a.id, phase: 'reveal', text: a.text, reveal: a.reveal,

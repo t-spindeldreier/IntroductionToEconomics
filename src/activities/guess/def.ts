@@ -1,5 +1,8 @@
-// Guess: a numeric guess with one or more hidden versions ("arms").
-// With a single arm it is a plain numeric poll.
+// Guess: a numeric guess. Three uses:
+//   - with two or more hidden versions ("arms"): the randomized experiment;
+//   - with "splitBy": the answers are shown split by what students answered to a
+//     choice question (groups they chose themselves, for comparison with the experiment);
+//   - with neither: a plain numeric poll.
 //
 // Session file fields:
 //   stageText       question shown on the stage while collecting (neutral, no anchor)
@@ -8,32 +11,54 @@
 //   part1Options    two button labels for part 1 (default: More, Less)
 //   part2           the guess prompt; "___" marks where the input field goes
 //   arms            list of { label, anchor }; default: one arm
+//   splitBy         id of a choice activity (its first item): one row per option
 //   min, max        allowed range; exclusiveMin: true means "greater than min"
-//   axis            { min, max } of the log-scale dot plot (default 1 to 10000)
+//   axis            { min, max, scale } of the dot plot; scale is log (default) or linear
 //   revealHeadline  headline for the "versions" reveal
 //   truth           optional { value, label }
+//   takeaway        one or two sentences shown with the last reveal and in the study slides
 
 import { S } from '../../strings';
-import type { Activity, ActivityDef, EnterContext, FramePatch, Resp } from '../../core/types';
+import type { Activity, ActivityDef, EnterContext, FramePatch, LiveData } from '../../core/types';
 import { armOf } from '../../core/identity';
 import { median } from '../../core/stats';
 
-export interface GuessArmSummary {
-  label: string;
+export interface GuessGroup {
+  label: string; // "A", or the option text
+  title: string; // "Version A", "Yes", "All answers"
   n: number;
   median: number | null;
   values: number[];
 }
 
-/** Split the answers by arm. The arm is recomputed from the pid, never taken from the phone. */
-export function summariseGuess(a: Activity, responses: Resp[]): GuessArmSummary[] {
-  const arms: GuessArmSummary[] = a.arms.map((arm: any) => ({ label: arm.label, n: 0, median: null, values: [] }));
-  for (const r of responses) arms[armOf(r.pid, a.id, arms.length)].values.push(r.v);
-  for (const arm of arms) {
-    arm.n = arm.values.length;
-    arm.median = median(arm.values);
+/**
+ * The answers in groups: by arm (recomputed from the pid, never taken from the
+ * phone), by the answer to another question (splitBy), or all in one group.
+ */
+export function summariseGuess(a: Activity, live: Pick<LiveData, 'responses'>): GuessGroup[] {
+  const responses = live.responses(a.id);
+  let groups: GuessGroup[];
+  if (a.splitBy) {
+    const options: string[] = a.splitOptions;
+    const chosen = new Map(live.responses(`${a.splitBy}-1`).map((r) => [r.pid, r.v]));
+    groups = options.map((o) => ({ label: o, title: o, n: 0, median: null, values: [] }));
+    for (const r of responses) {
+      const option = chosen.get(r.pid);
+      if (option !== undefined && groups[option]) groups[option].values.push(r.v);
+    }
+  } else {
+    groups = a.arms.map((arm: any) => ({
+      label: arm.label,
+      title: a.arms.length > 1 ? `${S.version} ${arm.label}` : S.allAnswers,
+      n: 0, median: null, values: [],
+    }));
+    for (const r of responses) groups[armOf(r.pid, a.id, groups.length)].values.push(r.v);
   }
-  return arms;
+  for (const g of groups) {
+    g.n = g.values.length;
+    g.median = median(g.values);
+  }
+  return groups;
 }
 
 export function part1Text(a: Record<string, any>, anchor: unknown): string {
@@ -44,13 +69,15 @@ export const guessDef: ActivityDef = {
   type: 'guess',
 
   validate(a, v) {
-    v.only(a, ['type', 'id', 'stageText', 'stageHint', 'part1', 'part1Options', 'part2', 'arms',
-      'min', 'max', 'exclusiveMin', 'axis', 'revealHeadline', 'truth']);
+    v.only(a, ['type', 'id', 'stageText', 'stageHint', 'part1', 'part1Options', 'part2', 'arms', 'splitBy',
+      'min', 'max', 'exclusiveMin', 'axis', 'revealHeadline', 'truth', 'takeaway']);
     v.text(a, 'stageText', { required: true });
     v.text(a, 'stageHint');
     v.text(a, 'part1');
     v.text(a, 'part2', { required: true });
     v.text(a, 'revealHeadline');
+    v.text(a, 'takeaway', { max: 400 });
+    v.text(a, 'splitBy', { max: 30 });
     v.number(a, 'min');
     v.number(a, 'max');
     v.bool(a, 'exclusiveMin');
@@ -64,6 +91,7 @@ export const guessDef: ActivityDef = {
       v.at('arms').err('must be a list of 1 to 4 arms');
       a.arms = [{ label: 'A' }];
     }
+    if (a.splitBy && a.arms.length > 1) v.at('splitBy').err('cannot be combined with several arms');
     a.arms.forEach((arm: any, i: number) => {
       const av = v.at(`arms[${i + 1}]`);
       if (typeof arm !== 'object' || arm === null) return av.err('must have a label');
@@ -88,7 +116,10 @@ export const guessDef: ActivityDef = {
     const ax = v.at('axis');
     if (typeof a.axis !== 'object' || a.axis === null) ax.err('must have min and max');
     else {
-      ax.number(a.axis, 'min', { required: true, min: 1e-9 });
+      ax.only(a.axis, ['min', 'max', 'scale']);
+      a.axis.scale ??= 'log';
+      if (a.axis.scale !== 'log' && a.axis.scale !== 'linear') ax.at('scale').err('must be log or linear');
+      ax.number(a.axis, 'min', { required: true, min: a.axis.scale === 'log' ? 1e-9 : undefined });
       ax.number(a.axis, 'max', { required: true });
       if (a.axis.min >= a.axis.max) ax.err('min must be below max');
     }
@@ -102,6 +133,14 @@ export const guessDef: ActivityDef = {
         tv.text(a.truth, 'label', { required: true, max: 80 });
       }
     }
+  },
+
+  // splitBy must name a choice activity; remember its options for the group labels.
+  link(a, activities, v) {
+    if (!a.splitBy) return;
+    const other = activities[a.splitBy];
+    if (!other || other.type !== 'choice') return v.at('splitBy').err(`"${a.splitBy}" must be a choice activity`);
+    a.splitOptions = other.items[0].options ?? other.options;
   },
 
   itemCount: () => 0,
@@ -118,7 +157,7 @@ export const guessDef: ActivityDef = {
     if (phase === 'open') return S.phase.open;
     if (phase === 'closed') return S.phase.closed;
     const reveals = this.phases(a).filter((p) => p !== 'open' && p !== 'closed');
-    return S.phase.revealStep(reveals.indexOf(phase) + 1, reveals.length);
+    return reveals.length === 1 ? S.phase.reveal : S.phase.revealStep(reveals.indexOf(phase) + 1, reveals.length);
   },
   stepLabel: (a) => `${S.step.guess}: ${shorten(a.stageText)}`,
 
@@ -146,13 +185,12 @@ export const guessDef: ActivityDef = {
     // versions / results / truth: phones learn which version they had.
     const view = { ...base, part1: a.part1 ?? null, arms: armsPublic };
     if (frame.phase === 'versions') return { view };
-    const arms = summariseGuess(a, live.responses(a.id));
     return {
       view,
       results: {
         id: a.id,
         board: false,
-        data: { type: 'guess', arms: arms.map(({ label, n, median }) => ({ label, n, median })) },
+        data: { type: 'guess', groups: summariseGuess(a, live).map(({ label, n, median }) => ({ label, n, median })) },
       },
     };
   },

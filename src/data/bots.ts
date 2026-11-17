@@ -24,12 +24,18 @@ export function fakeAnswer(a: Activity, frame: Frame, open: OpenWindow, pid: str
 
   if (a.type === 'guess') {
     const anchor = Number(a.arms[armOf(pid, a.id, a.arms.length)].anchor);
-    const truth = a.truth?.value ?? 50;
+    // Without a true value, aim at the middle of the plot's axis.
+    let truth = a.truth?.value ?? (a.axis.scale === 'linear' ? (a.axis.min + a.axis.max) / 2 : Math.sqrt(a.axis.min * a.axis.max));
+    // A guess that is split by another question: make the groups differ, as self-chosen groups do.
+    if (a.splitBy) {
+      const n = a.splitOptions.length;
+      truth *= 1.3 - (0.4 * armOf(pid, 'bot-' + a.splitBy, n)) / Math.max(1, n - 1);
+    }
     // Somewhere between the truth and the anchor on a log scale, plus noise.
     const centre = Number.isFinite(anchor) && anchor > 0
       ? Math.exp(0.5 * Math.log(anchor) + 0.5 * Math.log(Math.max(truth, 1e-6)))
       : truth;
-    let v = Math.exp(Math.log(Math.max(centre, 1e-6)) + 0.7 * normal(rand));
+    let v = Math.exp(Math.log(Math.max(centre, 1e-6)) + (a.splitBy ? 0.3 : 0.7) * normal(rand));
     v = Math.min(a.max, Math.max(a.exclusiveMin ? a.min + 0.5 : a.min, v));
     v = v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
     if (a.exclusiveMin && v <= a.min) v = a.min + 1;
@@ -39,7 +45,8 @@ export function fakeAnswer(a: Activity, frame: Frame, open: OpenWindow, pid: str
   // choice
   const n = open.n ?? 2;
   const correct: number | null = a.items[frame.item ?? 0].correct;
-  let v = Math.floor(rand() * n);
+  // A question without a correct answer is an opinion: the same simulated student always gives the same one.
+  let v = armOf(pid, 'bot-' + a.id, n);
   if (correct !== null) {
     if (rand() < 0.6) v = correct;
     else if (n > 1) v = (correct + 1 + Math.floor(rand() * (n - 1))) % n;

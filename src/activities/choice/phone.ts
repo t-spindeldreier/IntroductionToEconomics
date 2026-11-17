@@ -27,6 +27,7 @@ export const choicePhone: PhoneViewFn = (view, env) => {
   const answer = env.client.answers[key];
 
   if (view.phase === 'leaderboard') return waiting(ownStanding(env, false));
+  if (view.phase === 'split') return waiting();
 
   if (view.phase === 'reveal') {
     const reveal = view.reveal as { correct: number | null; explain: string | null };

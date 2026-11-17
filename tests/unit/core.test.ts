@@ -8,7 +8,8 @@ import { countOptions, logPosition, median, parseGuess } from '../../src/core/st
 import { leaderboard, pointsFor } from '../../src/core/scoring';
 import { compileSession, nextLabel } from '../../src/core/session';
 import { toCsv } from '../../src/core/csv';
-import { studySlidesHtml } from '../../src/core/handout';
+import { examBankHtml, studySlidesHtml } from '../../src/core/handout';
+import { summariseGuess } from '../../src/activities/guess/def';
 
 describe('sha256 and identity', () => {
   it('matches known SHA-256 values', () => {
@@ -126,14 +127,14 @@ describe('session files', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (!r.ok) return;
     const { session } = r;
-    // 1 lobby + 1 close + 6x2 + 1 + 3 reveals + 4 + 1 + 2 + 8x3 + podium + 2 + end
-    expect(session.frames.length).toBe(1 + 1 + 12 + 1 + 3 + 4 + 1 + 2 + 24 + 1 + 2 + 1 + 5); // + 5 section slides
-    expect(session.sections.map((s) => s.title)).toEqual(
-      ['Real or fake?', 'The experiment you were part of', 'Design clinic', 'Speed quiz', 'Exam minute']);
+    expect(session.frames.length).toBe(50);
+    expect(session.sections.length).toBe(4);
     expect(session.frames[0].section).toBe(-1);
-    expect(session.frames.at(-1)!.section).toBe(4);
-    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4, 5, 0, 6, 6]);
-    expect(session.activities.rf.items.map((i: any) => i.correct)).toEqual([0, 1, 0, 0, 1, 0]);
+    expect(session.frames.at(-1)!.section).toBe(3);
+    expect(session.exam.length).toBeGreaterThanOrEqual(8);
+    // the salary guess is split by the answers to the master question
+    expect(session.activities.salary.splitOptions).toEqual(['Yes', 'No', 'Not sure']);
+    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4, 6]);
     // the hint before the first reveal must not say "versions"
     const firstReveal = session.frames.findIndex((f) => f.phase === 'versions');
     expect(nextLabel(session, firstReveal - 1)).toBe('reveal (1 of 3)');
@@ -174,6 +175,44 @@ describe('session files', () => {
     expect(errors([{ activity: 'p', phases: ['reveal'] }])).toContain('"reveal" is not a phase');
     expect(errors([{ activity: 'p', collect: 'p' }])).toContain('only allowed on the lobby step');
     expect(errors(['lobby', 'p', 'end'])).toBe('');
+  });
+});
+
+describe('groups of a guess', () => {
+  const r = compileSession({
+    title: 't',
+    activities: {
+      plan: { type: 'choice', question: 'Q', options: ['Yes', 'No'], compareBy: 'exp', items: [{ text: 'Plan?' }] },
+      exp: { type: 'guess', stageText: 's', part2: 'p', arms: [{ label: 'A' }, { label: 'B' }] },
+      pay: { type: 'guess', stageText: 's', part2: 'p', splitBy: 'plan' },
+    },
+    steps: ['plan', { activity: 'plan', phases: ['split'] }, 'exp', 'pay'],
+    exam: [{ question: 'Why?', answer: 'Because.', points: 4 }],
+  });
+  if (!r.ok) throw new Error(r.errors.join());
+  const resp = (key: string, pid: string, v: number) => ({ key, pid, v, at: 0, fake: false });
+  const data: Record<string, any[]> = {
+    'plan-1': [resp('plan-1', 'a', 0), resp('plan-1', 'b', 0), resp('plan-1', 'c', 1)],
+    pay: [resp('pay', 'a', 60), resp('pay', 'b', 80), resp('pay', 'c', 40), resp('pay', 'd', 999)],
+  };
+  const live = { responses: (key: string) => data[key] ?? [], participants: new Map(), timing: () => null };
+
+  it('splits a guess by the answers to a choice question', () => {
+    const groups = summariseGuess(r.session.activities.pay, live);
+    expect(groups.map((g) => [g.title, g.n, g.median])).toEqual([['Yes', 2, 70], ['No', 1, 40]]); // d never answered "plan"
+  });
+  it('builds the exam bank with model answers and class numbers', () => {
+    const html = examBankHtml(r.session, live, 'ABCD');
+    expect(html).toContain('For the tutor only');
+    expect(html).toContain('Because.');
+    expect(html).toContain('<td>70</td>');
+  });
+  it('keeps exam questions out of the study slides', () => {
+    expect(studySlidesHtml(r.session, live, 'ABCD')).not.toContain('Because.');
+  });
+  it('rejects broken references', () => {
+    const bad = compileSession({ title: 't', activities: { pay: { type: 'guess', stageText: 's', part2: 'p', splitBy: 'nope' } }, steps: ['pay'] });
+    expect(bad.ok ? '' : bad.errors.join()).toContain('activities.pay.splitBy: "nope" must be a choice activity');
   });
 });
 

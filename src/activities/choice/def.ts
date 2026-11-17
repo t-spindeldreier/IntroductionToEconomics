@@ -7,10 +7,13 @@
 //   timed      seconds per item; leave out for untimed
 //   scored     true = points and leaderboard (needs "correct" on every item)
 //   letters    show "A.", "B." in front of the options (default: more than two options)
+//   compareBy  id of a guess activity with several arms. Adds the phase "split":
+//              the answers per arm side by side (the balance check of an experiment)
 //   items      list of { text, correct, explanation, source, options }
 //              correct: option number (1 = first), letter ("B") or the exact option text
 //
-// Phases per item: open, closed (optional), reveal, leaderboard (scored only).
+// Phases per item: open, closed (optional), reveal, leaderboard (scored only),
+// split (only with compareBy; never a default).
 
 import { S } from '../../strings';
 import type { Activity, ActivityDef, EnterContext, FramePatch, LiveData, Session } from '../../core/types';
@@ -96,7 +99,10 @@ export const choiceDef: ActivityDef = {
   type: 'choice',
 
   validate(a, v) {
-    v.only(a, ['type', 'id', 'question', 'options', 'timed', 'scored', 'letters', 'items']);
+    v.only(a, ['type', 'id', 'question', 'options', 'timed', 'scored', 'letters', 'items', 'compareBy', 'splitHeadline', 'takeaway']);
+    v.text(a, 'compareBy', { max: 30 });
+    v.text(a, 'splitHeadline', { max: 120 });
+    v.text(a, 'takeaway', { max: 400 });
     v.text(a, 'question', { required: true, max: 200 });
     v.number(a, 'timed', { min: 5, max: 600 });
     v.bool(a, 'scored');
@@ -132,12 +138,21 @@ export const choiceDef: ActivityDef = {
     a.letters ??= a.items.some((_: unknown, i: number) => (a.items[i].options ?? a.options ?? []).length > 2);
   },
 
+  link(a, activities, v) {
+    if (!a.compareBy) return;
+    const other = activities[a.compareBy];
+    if (!other || other.type !== 'guess' || other.arms.length < 2) {
+      v.at('compareBy').err(`"${a.compareBy}" must be a guess activity with two or more arms`);
+    }
+  },
+
   itemCount: (a) => a.items.length,
-  phases: (a) => ['open', 'closed', 'reveal', ...(a.scored ? ['leaderboard'] : [])],
+  phases: (a) => ['open', 'closed', 'reveal', ...(a.scored ? ['leaderboard'] : []), ...(a.compareBy ? ['split'] : [])],
   defaultPhases: (a) => ['open', 'reveal', ...(a.scored ? ['leaderboard'] : [])],
 
   phaseLabel(_a, phase) {
-    return { open: S.phase.open, closed: S.phase.closed, reveal: S.phase.reveal, leaderboard: S.phase.leaderboard }[phase] ?? phase;
+    return { open: S.phase.open, closed: S.phase.closed, reveal: S.phase.reveal, leaderboard: S.phase.leaderboard,
+      split: S.phase.reveal }[phase] ?? phase;
   },
   stepLabel: (a, item) => `${S.step.question} ${(item ?? 0) + 1}/${a.items.length}: ${shorten(a.items[item ?? 0].text, 40)}`,
 
@@ -163,6 +178,7 @@ export const choiceDef: ActivityDef = {
       };
     }
     if (frame.phase === 'closed') return { view };
+    if (frame.phase === 'split') return { view: { type: 'choice', key: frame.key, phase: 'split' } };
 
     // reveal and leaderboard: only now do counts, the correct option and the
     // explanation enter a document that phones can read.

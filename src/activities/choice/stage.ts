@@ -10,6 +10,9 @@ import { answerCount, stageCountdown, type StageEnv, type StageViewFn } from '..
 import { optionBars } from '../../stage/plots';
 import { modePill } from '../../ui/pill';
 import { optionsOf, standingsUpTo } from './def';
+import { sharesByArm } from '../../core/handout';
+import { ARM_COLOURS } from '../../stage/plots';
+import { rich } from '../../ui/dom';
 
 export function topList(env: StageEnv, n: number): HTMLElement {
   const standings = standingsUpTo(env.session, env.frame.index, env.ctl.live).slice(0, n);
@@ -37,6 +40,24 @@ export const choiceStage: StageViewFn = (env) => {
     return h('div', { class: 'view' }, h('h1', { class: 'headline' }, S.top5), topList(env, 5));
   }
 
+  // The balance check: the same answers, side by side for the arms of an experiment.
+  if (phase === 'split') {
+    const arms = sharesByArm(a, env.frame.key, env.session.activities[a.compareBy], env.ctl);
+    const share = (k: number, n: number) => (n ? Math.round((100 * k) / n) : 0);
+    return h('div', { class: 'view' },
+      h('h1', { class: 'headline' }, a.splitHeadline ?? item.text),
+      h('p', { class: 'kicker' }, item.text),
+      h('div', { class: 'split' }, options.map((o, k) =>
+        h('div', { class: 'split-row' },
+          h('p', { class: 'split-option' }, o),
+          h('div', { class: 'split-bars' }, arms.map((arm, i) =>
+            h('div', { class: 'split-bar', title: `${S.version} ${arm.label}: ${arm.counts[k]} of ${arm.n}` },
+              h('span', { class: 'split-arm' }, `${S.version} ${arm.label}`),
+              h('div', { class: 'bar-fill', style: `width:${share(arm.counts[k], arm.n) * 0.6}%;background:${ARM_COLOURS[i]}` }),
+              h('span', { class: 'bar-count' }, `${share(arm.counts[k], arm.n)}%`))))))),
+      a.takeaway ? h('div', { class: 'answer-card compact' }, h('p', { class: 'answer-text' }, rich(a.takeaway))) : null);
+  }
+
   if (phase === 'reveal') {
     const counts = countOptions(responses.map((r) => r.v), options.length);
     const correct = item.correct as number | null;
@@ -45,7 +66,8 @@ export const choiceStage: StageViewFn = (env) => {
       correct !== null ? h('div', { class: 'answer-card' },
         h('p', { class: 'answer-label' }, S.correctAnswer),
         h('p', { class: 'answer-main' }, a.letters ? `${String.fromCharCode(65 + correct)}. ` : '', options[correct]),
-        item.explanation ? h('p', { class: 'answer-text' }, item.explanation) : null) : null,
+        item.explanation ? h('p', { class: 'answer-text' }, item.explanation) : null)
+        : item.explanation ? h('div', { class: 'answer-card compact' }, h('p', { class: 'answer-text' }, item.explanation)) : null,
       optionBars(options, counts, correct, a.letters),
       item.source ? h('p', { class: 'source muted' }, `${S.source}: ${item.source}`) : null);
   }

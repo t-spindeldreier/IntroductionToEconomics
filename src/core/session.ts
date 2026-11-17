@@ -18,7 +18,23 @@ export function compileSession(raw: unknown): CompileResult {
     return fail();
   }
   const file = structuredClone(raw) as Record<string, any>;
-  v.only(file, ['title', 'activities', 'steps']);
+  v.only(file, ['title', 'activities', 'steps', 'exam', 'images']);
+  // "images" is filled in by the stage page when figures are selected with the file.
+  const images: Record<string, string> = typeof file.images === 'object' && file.images !== null ? file.images : {};
+
+  // ----- exam question bank (tutor only) -----
+  const exam: Session['exam'] = [];
+  if (file.exam !== undefined && !Array.isArray(file.exam)) v.at('exam').err('must be a list of { question, answer }');
+  (Array.isArray(file.exam) ? file.exam : []).forEach((e: any, i: number) => {
+    const ev = v.at(`exam[${i + 1}]`);
+    if (typeof e !== 'object' || e === null) return ev.err('must have a question and an answer');
+    ev.only(e, ['question', 'answer', 'about', 'points']);
+    ev.text(e, 'question', { required: true, max: 800 });
+    ev.text(e, 'answer', { required: true, max: 1500 });
+    ev.text(e, 'about', { max: 120 });
+    ev.number(e, 'points', { min: 1, max: 100 });
+    exam.push({ question: e.question, answer: e.answer, about: e.about ?? null, points: e.points ?? null });
+  });
   v.text(file, 'title', { required: true, max: 100 });
 
   // ----- activities -----
@@ -41,6 +57,10 @@ export function compileSession(raw: unknown): CompileResult {
   }
   // Built-in activities need no declaration.
   for (const type of BUILT_IN) activities[type] ??= { type, id: type };
+  // References between activities (a guess split by a choice, a balance check).
+  if (v.errors.length === 0) {
+    for (const a of Object.values(activities)) defs[a.type].link?.(a, activities, v.at(`activities.${a.id}`));
+  }
 
   // ----- steps -----
   const frames: Frame[] = [];
@@ -123,7 +143,7 @@ export function compileSession(raw: unknown): CompileResult {
 
   if (frames.length > 400) v.err('The session has more than 400 key presses. Split it.');
   if (v.errors.length > 0) return fail();
-  return { ok: true, session: { title: file.title, activities, frames, steps, sections } };
+  return { ok: true, session: { title: file.title, activities, frames, steps, sections, exam, images } };
 }
 
 /** The hint in the corner of the stage: what the next press of the right arrow does. */

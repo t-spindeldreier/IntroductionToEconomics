@@ -85,6 +85,10 @@ export interface Session {
   steps: Step[];
   /** The parts of the session, from the "section" steps. Empty if the file has none. */
   sections: { title: string; subtitle: string | null; firstFrame: number }[];
+  /** Figures by file name, as data URLs. Stored once, however often they are shown. */
+  images: Record<string, string>;
+  /** Open exam questions with model answers. Tutor only: never shown to students. */
+  exam: { question: string; answer: string; about: string | null; points: number | null }[];
 }
 
 /** One entry in the host's step list: an activity (or one item of it). */
@@ -147,6 +151,8 @@ export interface ActivityDef {
   /** Label for the host's step list. Must not give anything away. */
   stepLabel(a: Activity, item: number | null): string;
   enter(ctx: EnterContext): FramePatch;
+  /** Optional: check references to other activities, after all of them are validated. */
+  link?(a: Activity, activities: Record<string, Activity>, v: Validator): void;
 }
 
 /** Collects validation errors with the place they occurred. */

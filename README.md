@@ -142,8 +142,10 @@ database only through the stage page and are readable by hosts only.
 | `part1`, `part1Options` | optional first question with two buttons; `{anchor}` is replaced by the arm's anchor, `**bold**` works |
 | `part2` | the guess prompt; `___` marks where the input field goes |
 | `arms` | list of `{ label, anchor }`. Leave it out for a plain numeric poll |
+| `splitBy` | id of a choice activity: the reveal shows one row per option of that question, so groups that students chose themselves can be compared (not together with `arms`) |
+| `takeaway` | one or two sentences shown with the last reveal and in the study slides |
 | `min`, `max`, `exclusiveMin` | allowed range; `exclusiveMin: true` means "greater than min" |
-| `axis` | `{ min, max }` of the log-scale dot plot; default 1 to 10000 |
+| `axis` | `{ min, max, scale }` of the dot plot; `scale` is `log` (default) or `linear`; default 1 to 10000 |
 | `revealHeadline` | headline when the versions are revealed |
 | `truth` | optional `{ value, label }` |
 
@@ -160,6 +162,7 @@ as a coin flip, and neither the student nor the tutor can influence it.
 | `timed` | seconds per item; leave out for untimed |
 | `scored` | `true` for points and a leaderboard; every item then needs `correct` |
 | `items` | list of `{ text, correct, explanation, source, options }` |
+| `compareBy` | id of a guess with two or more arms. Adds the phase `split`: the answers side by side for the arms, as a balance check of the experiment. `splitHeadline` and `takeaway` set its texts |
 
 `correct` is the option number (1 is the first), its letter, or its exact text.
 Phases per item: `open`, `closed`, `reveal`, `leaderboard` (scored only). By default
@@ -175,6 +178,7 @@ the time left. Ties are broken by the lower total response time.
 | `timer` | countdown in seconds; `autostart: false` if it should wait for T |
 | `reveal` | hidden second text (a model answer, the real study), shown by the next press |
 | `revealTitle` | heading of that text; default "Answer" |
+| `image`, `revealImage` | file name of a figure shown with the prompt or with the hidden text, on the projector only |
 | `mode` | how students work on it, shown as a label on stage and phones: `pair` (with your neighbour), `group`, `discuss` (class discussion), `paper` (on paper, on your own) or `think` |
 
 Guess and choice questions carry the label "On your phone" by themselves.
@@ -198,6 +202,23 @@ steps:
 
 The same activity can appear in several steps, which is how collecting and revealing
 are separated.
+
+**Figures.** Write the file name in the session file (`image: fig-methods.jpg`) and
+select the image files together with the session file in the "Load a session file…"
+dialog (hold Ctrl to pick several). The figures are stored inside the session, which
+only hosts can read, and are never sent to phones. Keep a session with its figures
+under about 900 kB; JPEG or PNG at 800 to 1200 pixels width is plenty.
+
+**Exam question bank.** A session file may end with a list of open questions and
+model answers that only you ever see:
+
+```yaml
+exam:
+  - question: "Why did the app flip a coin for each student?"
+    answer: "Because front and back rows differ in more than the number ..."
+    about: "Discussion question on random assignment"
+    points: 4
+```
 
 **Sections** give the session an outline, like a presentation:
 
@@ -250,6 +271,15 @@ the class results are gone.
   screenshots of single slides.
 
 The file contains all answers. Do not publish it before the session.
+
+### Exam question bank
+
+H, "Download exam question bank" saves `<CODE>_exam_bank.html`, for you only. It lists
+the questions and model answers from the `exam` list of the session file, followed by
+what happened in this class: medians and group sizes of every guess, shares for every
+choice question, and the balance check. Months later you can pick questions from it
+and make them concrete with the class's own numbers. Like the study slides, download
+it before deleting the room.
 
 H, "Delete all data of this room" removes all answers, participants, results and the
 room. It asks you to type the room code first.
@@ -313,6 +343,8 @@ npm test              # unit tests: medians, scoring, session validation, CSV
 npm run test:rules    # security rules on the emulator, one block per guarantee
 npm run simulate      # 100 phones and a stage through the whole session; checks the budget
 npm run smoke         # real browser: one stage, three phones, screenshots in smoke-shots/
+node scripts/emu.mjs emulators:exec --only firestore,auth "node scripts/preview.mjs sessions/private/week1.yaml"
+                      # proof-read a session: every screen with simulated students, in preview-shots/
 npm run build         # type check, build, report the gzipped phone download
 ```
 
