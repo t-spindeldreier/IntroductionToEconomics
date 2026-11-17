@@ -35,7 +35,11 @@ export function fakeAnswer(a: Activity, frame: Frame, open: OpenWindow, pid: str
     const centre = Number.isFinite(anchor) && anchor > 0
       ? Math.exp(0.5 * Math.log(anchor) + 0.5 * Math.log(Math.max(truth, 1e-6)))
       : truth;
-    let v = Math.exp(Math.log(Math.max(centre, 1e-6)) + (a.splitBy ? 0.3 : 0.7) * normal(rand));
+    // A hint pulls the simulated students who see it close to the truth.
+    const hinted = a.hintOption !== undefined && armOf(pid, 'bot-' + a.splitBy, a.splitOptions.length) === a.hintOption;
+    // Without the hint they guess as in the first round: around the middle of the axis.
+    const unhinted = a.before ? (centre / truth) * Math.sqrt(a.axis.min * a.axis.max) : centre;
+    let v = Math.exp(Math.log(Math.max(hinted ? (a.truth?.value ?? centre) : unhinted, 1e-6)) + (hinted ? 0.15 : a.splitBy ? 0.3 : 0.7) * normal(rand));
     v = Math.min(a.max, Math.max(a.exclusiveMin ? a.min + 0.5 : a.min, v));
     v = v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
     if (a.exclusiveMin && v <= a.min) v = a.min + 1;

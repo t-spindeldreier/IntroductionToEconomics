@@ -144,6 +144,7 @@ database only through the stage page and are readable by hosts only.
 | `arms` | list of `{ label, anchor }`. Leave it out for a plain numeric poll |
 | `splitBy` | id of a choice activity: the reveal shows one row per option of that question, so groups that students chose themselves can be compared (not together with `arms`) |
 | `takeaway` | one or two sentences shown with the last reveal and in the study slides |
+| `before`, `hint`, `hintFor` | a before-and-after game (difference-in-differences), see below |
 | `min`, `max`, `exclusiveMin` | allowed range; `exclusiveMin: true` means "greater than min" |
 | `axis` | `{ min, max, scale }` of the dot plot; `scale` is `log` (default) or `linear`; default 1 to 10000 |
 | `revealHeadline` | headline when the versions are revealed |
@@ -219,6 +220,29 @@ exam:
     about: "Discussion question on random assignment"
     points: 4
 ```
+
+**The hint game (difference-in-differences).** Three activities: a choice question
+with exactly two options that defines two groups ("Where are you sitting? Front half /
+Back half"), a first guess, and a second guess with
+
+```yaml
+    splitBy: side            # the choice question
+    before: pop1             # the first guess
+    hint: "Hint, only for the front half: fewer than 500 thousand."
+    hintFor: "Front half"    # the option whose phones show the hint
+```
+
+While the second guess is open, only the phones that chose that option show the hint;
+the projector shows nothing of it. The second guess then has the phases `change` (first
+guess, second guess and change per group, for students who answered both times) and
+`did` (the change of one group minus the change of the other, with the `takeaway`),
+besides `results` and `truth`. Be aware that the hint text travels to every phone and is
+only hidden by the app; a student who inspects the network traffic could read it.
+
+**Table.** `type: table` shows a comparison table on the projector (phones only show
+its title) and in the study slides: `title`, `columns` (2 to 5 headings), `rows` (2 to 8
+lists with one text per column), optional `note`, and `stepwise: true` for one key press
+per row.
 
 **Sections** give the session an outline, like a presentation:
 
@@ -343,6 +367,8 @@ npm test              # unit tests: medians, scoring, session validation, CSV
 npm run test:rules    # security rules on the emulator, one block per guarantee
 npm run simulate      # 100 phones and a stage through the whole session; checks the budget
 npm run smoke         # real browser: one stage, three phones, screenshots in smoke-shots/
+node scripts/emu.mjs emulators:exec --only firestore,auth "node scripts/smoke-hint.mjs"
+                      # real browser: the hint game with one phone in each group
 node scripts/emu.mjs emulators:exec --only firestore,auth "node scripts/preview.mjs sessions/private/week1.yaml"
                       # proof-read a session: every screen with simulated students, in preview-shots/
 npm run build         # type check, build, report the gzipped phone download

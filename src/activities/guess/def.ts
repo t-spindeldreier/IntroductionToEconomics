@@ -17,6 +17,15 @@
 //   revealHeadline  headline for the "versions" reveal
 //   truth           optional { value, label }
 //   takeaway        one or two sentences shown with the last reveal and in the study slides
+//
+// A before-and-after comparison (difference-in-differences) needs two guesses and
+// one choice question with exactly two options. On the second guess:
+//   splitBy         the choice question that defines the two groups
+//   before          id of the first guess. Adds the phases "change" (first guess,
+//                   second guess and change per group) and "did" (the change of
+//                   one group minus the change of the other, with the takeaway)
+//   hint            text that only one group sees on the phone, above the question
+//   hintFor         which group: the option's exact text or its number (1 = first)
 
 import { S } from '../../strings';
 import type { Activity, ActivityDef, EnterContext, FramePatch, LiveData } from '../../core/types';
@@ -61,6 +70,47 @@ export function summariseGuess(a: Activity, live: Pick<LiveData, 'responses'>): 
   return groups;
 }
 
+export interface GuessChange {
+  title: string;
+  hinted: boolean;
+  n: number; // students of this group who answered both rounds
+  before: number | null;
+  after: number | null;
+  change: number | null;
+}
+
+/**
+ * Before and after, per group of the splitBy question, for students who answered
+ * both rounds. "did" is the change of the hinted group minus the change of the other.
+ */
+export function summariseChange(a: Activity, live: Pick<LiveData, 'responses'>): { rows: GuessChange[]; did: number | null } {
+  const options: string[] = a.splitOptions;
+  const chosen = new Map(live.responses(`${a.splitBy}-1`).map((r) => [r.pid, r.v]));
+  const first = new Map(live.responses(a.before).map((r) => [r.pid, r.v]));
+  const pairs: { before: number[]; after: number[] }[] = options.map(() => ({ before: [], after: [] }));
+  for (const r of live.responses(a.id)) {
+    const option = chosen.get(r.pid);
+    const b = first.get(r.pid);
+    if (option === undefined || b === undefined || !pairs[option]) continue;
+    pairs[option].before.push(b);
+    pairs[option].after.push(r.v);
+  }
+  const rows = options.map((title, i) => {
+    const before = median(pairs[i].before), after = median(pairs[i].after);
+    return { title, hinted: i === a.hintOption, n: pairs[i].before.length, before, after,
+      change: before === null || after === null ? null : after - before };
+  });
+  const treated = rows.find((r) => r.hinted), control = rows.find((r) => !r.hinted);
+  const did = treated && control && treated.change !== null && control.change !== null ? treated.change - control.change : null;
+  return { rows, did };
+}
+
+/** "+120", "−350", "0": a change with its sign. */
+export function signed(x: number | null, format: (x: number) => string): string {
+  if (x === null) return '–';
+  return x === 0 ? '0' : (x > 0 ? '+' : '−') + format(Math.abs(x));
+}
+
 export function part1Text(a: Record<string, any>, anchor: unknown): string {
   return String(a.part1 ?? '').replace('{anchor}', String(anchor ?? ''));
 }
@@ -70,7 +120,12 @@ export const guessDef: ActivityDef = {
 
   validate(a, v) {
     v.only(a, ['type', 'id', 'stageText', 'stageHint', 'part1', 'part1Options', 'part2', 'arms', 'splitBy',
-      'min', 'max', 'exclusiveMin', 'axis', 'revealHeadline', 'truth', 'takeaway']);
+      'min', 'max', 'exclusiveMin', 'axis', 'revealHeadline', 'truth', 'takeaway', 'before', 'hint', 'hintFor']);
+    v.text(a, 'before', { max: 30 });
+    v.text(a, 'hint', { max: 200 });
+    if (a.before && !a.splitBy) v.at('before').err('needs "splitBy" as well');
+    if (a.hint && !a.splitBy) v.at('hint').err('needs "splitBy" as well');
+    if (!!a.hint !== (a.hintFor !== undefined)) v.at('hint').err('"hint" and "hintFor" belong together');
     v.text(a, 'stageText', { required: true });
     v.text(a, 'stageHint');
     v.text(a, 'part1');
@@ -141,14 +196,31 @@ export const guessDef: ActivityDef = {
     const other = activities[a.splitBy];
     if (!other || other.type !== 'choice') return v.at('splitBy').err(`"${a.splitBy}" must be a choice activity`);
     a.splitOptions = other.items[0].options ?? other.options;
+    if (a.hintFor !== undefined) {
+      const i = typeof a.hintFor === 'number' ? a.hintFor - 1
+        : a.splitOptions.findIndex((o: string) => o.toLowerCase() === String(a.hintFor).trim().toLowerCase());
+      if (!Number.isInteger(i) || i < 0 || i >= a.splitOptions.length) {
+        return v.at('hintFor').err(`"${a.hintFor}" is not an option of "${a.splitBy}" (use the exact text or the number)`);
+      }
+      a.hintOption = i;
+    }
+    if (a.before) {
+      const first = activities[a.before];
+      if (!first || first.type !== 'guess' || first.id === a.id) return v.at('before').err(`"${a.before}" must be another guess activity`);
+      if (a.splitOptions.length !== 2) v.at('before').err(`needs a "splitBy" question with exactly two options`);
+      if (a.hintFor === undefined) v.at('before').err('needs "hint" and "hintFor" as well');
+    }
   },
 
   itemCount: () => 0,
 
   phases(a) {
-    return ['open', 'closed', ...(a.arms.length > 1 ? ['versions'] : []), 'results', ...(a.truth ? ['truth'] : [])];
+    return ['open', 'closed', ...(a.arms.length > 1 ? ['versions'] : []), 'results',
+      ...(a.before ? ['change', 'did'] : []), ...(a.truth ? ['truth'] : [])];
   },
+  // A before-and-after guess shows the change first and the plot with the true value last.
   defaultPhases(a) {
+    if (a.before) return ['open', 'closed', 'change', 'did', ...(a.truth ? ['truth'] : ['results'])];
     return this.phases(a);
   },
 
@@ -176,6 +248,9 @@ export const guessDef: ActivityDef = {
           min: a.min,
           max: a.max,
           xmin: a.exclusiveMin,
+          // Only phones that gave this answer to the splitBy question show the hint.
+          ...(a.hint ? { hint: a.hint, hintKey: `${a.splitBy}-1`, hintOpt: a.hintOption } : {}),
+          ...(a.before ? { beforeKey: a.before } : {}),
         },
         open: { key: a.id, type: 'guess', durationMs: null, min: a.min, max: a.max, xmin: a.exclusiveMin, p1: !!a.part1 },
       };
@@ -185,6 +260,10 @@ export const guessDef: ActivityDef = {
     // versions / results / truth: phones learn which version they had.
     const view = { ...base, part1: a.part1 ?? null, arms: armsPublic };
     if (frame.phase === 'versions') return { view };
+    // After the change is on the projector, phones may say whether they had the hint.
+    if (frame.phase === 'change' || frame.phase === 'did') {
+      return { view: { ...base, hint: a.hint, hintKey: `${a.splitBy}-1`, hintOpt: a.hintOption } };
+    }
     return {
       view,
       results: {

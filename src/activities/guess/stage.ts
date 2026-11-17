@@ -8,7 +8,7 @@ import type { Activity } from '../../core/types';
 import { answerCount, type StageEnv, type StageViewFn } from '../../stage/env';
 import { ARM_COLOURS, dotPlot } from '../../stage/plots';
 import { modePill } from '../../ui/pill';
-import { part1Text, summariseGuess } from './def';
+import { part1Text, signed, summariseChange, summariseGuess } from './def';
 
 /** The neutral question with the answer count. Also used by the lobby. */
 export function guessCollecting(a: Activity, env: StageEnv): HTMLElement {
@@ -23,6 +23,28 @@ export const guessStage: StageViewFn = (env) => {
   const phase = env.frame.phase;
   if (phase === 'open' || phase === 'closed') {
     return h('div', { class: 'view centered' }, phase === 'open' ? modePill('phone') : null, guessCollecting(a, env));
+  }
+
+  // Before and after: one row per group; the "did" phase adds the subtraction.
+  if (phase === 'change' || phase === 'did') {
+    const { rows, did } = summariseChange(a, env.ctl);
+    const treated = rows.find((r) => r.hinted), control = rows.find((r) => !r.hinted);
+    const num = (x: number | null) => (x === null ? '–' : formatNumber(x));
+    return h('div', { class: 'view' },
+      h('h1', { class: 'headline' }, a.revealHeadline ?? S.changeHeadline),
+      h('p', { class: 'kicker' }, S.theHint, ': “', rich(a.hint), '”'),
+      h('table', { class: 'change-table' },
+        h('thead', null, h('tr', null, h('th', null), h('th', null, S.firstGuess), h('th', null, S.secondGuess), h('th', null, S.change))),
+        h('tbody', null, rows.map((r, i) => h('tr', null,
+          h('th', null, h('span', { class: 'swatch', style: `background:${ARM_COLOURS[i]}` }), r.title,
+            h('span', { class: 'muted' }, ` · ${r.hinted ? S.gotHint : S.noHint} · ${S.students(r.n)}`)),
+          h('td', null, num(r.before)), h('td', null, num(r.after)),
+          h('td', { class: 'change-cell' }, signed(r.change, formatNumber)))))),
+      phase === 'did' && treated && control ? h('div', { class: 'answer-card compact' },
+        h('p', { class: 'answer-label' }, S.didLabel),
+        h('p', { class: 'answer-main' }, `${signed(treated.change, formatNumber)} − (${signed(control.change, formatNumber)}) = ${signed(did, formatNumber)}`),
+        a.takeaway ? h('p', { class: 'answer-text' }, rich(a.takeaway)) : null)
+        : h('p', { class: 'plot-note muted' }, S.mediansBoth));
   }
 
   const groups = summariseGuess(a, env.ctl);
@@ -40,7 +62,7 @@ export const guessStage: StageViewFn = (env) => {
   }
 
   // results and truth
-  const last = phase === (a.truth ? 'truth' : 'results');
+  const last = !a.before && phase === (a.truth ? 'truth' : 'results'); // with "before", the takeaway belongs to "did"
   return h('div', { class: 'view' },
     h('p', { class: 'kicker' }, rich(a.stageText)),
     h('div', { class: 'medians' }, groups.map((g, i) =>

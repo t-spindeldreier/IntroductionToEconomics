@@ -9,12 +9,14 @@ import { guessDef } from './guess/def';
 import { choiceDef } from './choice/def';
 import { promptDef } from './prompt/def';
 import { lobbyDef, podiumDef, endDef, sectionDef } from './simple/def';
+import { tableDef } from './table/def';
 
 export const defs: Record<string, ActivityDef> = {
   lobby: lobbyDef,
   guess: guessDef,
   choice: choiceDef,
   prompt: promptDef,
+  table: tableDef,
   podium: podiumDef,
   section: sectionDef,
   end: endDef,

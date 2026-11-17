@@ -9,7 +9,7 @@ import { leaderboard, pointsFor } from '../../src/core/scoring';
 import { compileSession, nextLabel } from '../../src/core/session';
 import { toCsv } from '../../src/core/csv';
 import { examBankHtml, studySlidesHtml } from '../../src/core/handout';
-import { summariseGuess } from '../../src/activities/guess/def';
+import { summariseChange, summariseGuess } from '../../src/activities/guess/def';
 
 describe('sha256 and identity', () => {
   it('matches known SHA-256 values', () => {
@@ -127,14 +127,14 @@ describe('session files', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (!r.ok) return;
     const { session } = r;
-    expect(session.frames.length).toBe(50);
-    expect(session.sections.length).toBe(4);
+    expect(session.frames.length).toBe(71);
+    expect(session.sections.length).toBe(5);
     expect(session.frames[0].section).toBe(-1);
-    expect(session.frames.at(-1)!.section).toBe(3);
+    expect(session.frames.at(-1)!.section).toBe(4);
     expect(session.exam.length).toBeGreaterThanOrEqual(8);
     // the salary guess is split by the answers to the master question
     expect(session.activities.salary.splitOptions).toEqual(['Yes', 'No', 'Not sure']);
-    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4, 6]);
+    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4, 5, 6]);
     // the hint before the first reveal must not say "versions"
     const firstReveal = session.frames.findIndex((f) => f.phase === 'versions');
     expect(nextLabel(session, firstReveal - 1)).toBe('reveal (1 of 3)');
@@ -213,6 +213,52 @@ describe('groups of a guess', () => {
   it('rejects broken references', () => {
     const bad = compileSession({ title: 't', activities: { pay: { type: 'guess', stageText: 's', part2: 'p', splitBy: 'nope' } }, steps: ['pay'] });
     expect(bad.ok ? '' : bad.errors.join()).toContain('activities.pay.splitBy: "nope" must be a choice activity');
+  });
+});
+
+describe('before and after, and the table', () => {
+  const r = compileSession({
+    title: 't',
+    activities: {
+      side: { type: 'choice', question: 'Q', options: ['Front', 'Back'], items: [{ text: 'Where?' }] },
+      g1: { type: 'guess', stageText: 's', part2: 'p' },
+      g2: { type: 'guess', stageText: 's', part2: 'p', splitBy: 'side', before: 'g1', hint: 'Below 500', hintFor: 'Front', takeaway: 'Subtract.' },
+      t: { type: 'table', title: 'Designs', stepwise: true, columns: ['Design', 'Who'], rows: [['Lab', 'Coin'], ['RD', 'A **rule**']] },
+    },
+    steps: ['side', { activity: 'g1', phases: ['open', 'closed'] }, 'g2', 't'],
+  });
+  if (!r.ok) throw new Error(r.errors.join());
+  const resp = (key: string, pid: string, v: number) => ({ key, pid, v, at: 0, fake: false });
+  const data: Record<string, any[]> = {
+    'side-1': [resp('side-1', 'a', 0), resp('side-1', 'b', 0), resp('side-1', 'c', 1), resp('side-1', 'd', 1)],
+    g1: [resp('g1', 'a', 900), resp('g1', 'b', 700), resp('g1', 'c', 1000), resp('g1', 'd', 600)],
+    g2: [resp('g2', 'a', 450), resp('g2', 'b', 350), resp('g2', 'c', 900), resp('g2', 'e', 5)], // d did not answer again
+  };
+  const live = { responses: (key: string) => data[key] ?? [], participants: new Map(), timing: () => null };
+
+  it('computes the difference in differences from students who answered both rounds', () => {
+    const { rows, did } = summariseChange(r.session.activities.g2, live);
+    expect(rows.map((x) => [x.title, x.hinted, x.n, x.before, x.after, x.change])).toEqual([
+      ['Front', true, 2, 800, 400, -400], ['Back', false, 1, 1000, 900, -100]]);
+    expect(did).toBe(-300);
+  });
+  it('sends the hint only in the open view and orders the phases', () => {
+    const g2 = r.session.frames.filter((f) => f.id === 'g2').map((f) => f.phase);
+    expect(g2).toEqual(['open', 'closed', 'change', 'did', 'results']);
+    expect(r.session.frames.filter((f) => f.id === 't').map((f) => f.phase)).toEqual(['row1', 'row2']);
+  });
+  it('puts the change table and the design table into the handouts', () => {
+    const slides = studySlidesHtml(r.session, live, 'ABCD');
+    expect(slides).toContain('Difference in differences');
+    expect(slides).toContain('−300');
+    expect(slides).toContain('A <strong>rule</strong>');
+    expect(examBankHtml(r.session, live, 'ABCD')).toContain('−300');
+  });
+  it('rejects a before-and-after guess without two groups or a hint', () => {
+    const bad = compileSession({ title: 't', activities: {
+      g1: { type: 'guess', stageText: 's', part2: 'p' },
+      g2: { type: 'guess', stageText: 's', part2: 'p', before: 'g1' } }, steps: ['g1', 'g2'] });
+    expect(bad.ok ? '' : bad.errors.join()).toContain('before: needs "splitBy"');
   });
 });
 

@@ -153,6 +153,24 @@
 .view > .kicker { font-size: 1.7vw; }
 .plot-note { font-size: 1.7vw; }
 
+/* ---------- before and after (difference-in-differences) ---------- */
+.change-table { width: 100%; border-collapse: collapse; font-size: 2.3vw; }
+.change-table th, .change-table td { padding: 1.1vw 1.2vw; text-align: right; border-bottom: 0.15vw solid var(--line, #d8d5cc); }
+.change-table thead th { font-size: 1.6vw; color: var(--ink-2); font-weight: 700; }
+.change-table tbody th { text-align: left; font-weight: 800; }
+.change-table tbody th .muted { font-size: 1.5vw; font-weight: 400; }
+.change-table td { font-size: 3.6vw; font-weight: 800; font-variant-numeric: tabular-nums; }
+.change-table .change-cell { color: var(--blue); }
+
+/* ---------- comparison table ---------- */
+.compare-table { width: 100%; border-collapse: collapse; font-size: 1.5vw; line-height: 1.22; table-layout: fixed; }
+.view:has(.compare-table) .headline { font-size: 3vw; }
+.compare-table th, .compare-table td { padding: 0.65vw 1.2vw; text-align: left; vertical-align: top; border-bottom: 0.15vw solid var(--line, #d8d5cc); }
+.compare-table thead th { font-size: 1.2vw; color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; }
+.compare-table tbody th { font-weight: 800; color: var(--brand); width: 21%; }
+.compare-table tr.hidden-row > * { visibility: hidden; }
+.compare-table tr.new-row { background: var(--good-soft); }
+
 /* ---------- choice ---------- */
 .option-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7vw 2vw; font-size: 2.1vw; }
 .option-grid.two-col { grid-template-columns: 1fr 1fr; }

@@ -12,7 +12,7 @@
 import type { Activity, LiveData, Session } from './types';
 import { countOptions, formatNumber } from './stats';
 import { armOf } from './identity';
-import { summariseGuess, part1Text } from '../activities/guess/def';
+import { summariseChange, summariseGuess, part1Text, signed } from '../activities/guess/def';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 /** Escape, then turn **bold** into <strong>. */
@@ -47,6 +47,11 @@ const STYLE = `
   .options li { display: flex; justify-content: space-between; gap: 1em; padding: .2em .6em; border-radius: .4em; }
   .options li.right { background: #edf6f0; font-weight: 700; }
   .share { color: #5a6270; font-variant-numeric: tabular-nums; }
+  .grid { border-collapse: collapse; width: 100%; font-size: .8em; }
+  .grid th, .grid td { padding: .35em .7em; text-align: left; vertical-align: top; border-bottom: 1px solid #d8d5cc; }
+  .grid thead th { font-size: .8em; text-transform: uppercase; letter-spacing: .04em; color: #5a6270; }
+  .grid tbody th { color: #14304f; }
+  .grid.numbers { font-size: 1em; } .grid.numbers td { font-weight: 800; font-size: 1.3em; }
   .cols { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1.2em; }
   .box { padding: .7em 1em; background: #fff; border: .2em solid #0072b2; border-radius: .7em; display: flex; flex-direction: column; gap: .3em; }
   .box.g1 { border-color: #d55e00; } .box.g2 { border-color: #16181d; } .box.g3 { border-color: #6b7280; }
@@ -80,10 +85,20 @@ function* questions(session: Session): Generator<{ activity: Activity; item: num
     }
     const activity = session.activities[frame.collect ?? frame.id];
     const key = frame.collect ?? frame.key;
-    if (done.has(key) || !['guess', 'choice', 'prompt'].includes(activity.type)) continue;
+    if (done.has(key) || !['guess', 'choice', 'prompt', 'table'].includes(activity.type)) continue;
     done.add(key);
     yield { activity, item: frame.collect ? null : frame.item, key, part };
   }
+}
+
+/** Before, after and change per group as an HTML table (for a guess with "before"). */
+function changeTable(a: Activity, live: Pick<LiveData, 'responses'>): string {
+  const { rows, did } = summariseChange(a, live);
+  const num = (x: number | null) => (x === null ? '–' : formatNumber(x));
+  return `<table class="grid numbers"><thead><tr><th></th><th>First guess</th><th>Second guess</th><th>Change</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><th>${esc(r.title)} (${r.hinted ? 'got the hint' : 'no hint'}, ${r.n} students)</th>
+      <td>${num(r.before)}</td><td>${num(r.after)}</td><td>${signed(r.change, formatNumber)}</td></tr>`).join('')}
+    <tr><th>Difference in differences</th><td></td><td></td><td>${signed(did, formatNumber)}</td></tr></tbody></table>`;
 }
 
 /** Shares of the options of a choice item within each arm of an experiment (the balance check). */
@@ -109,6 +124,23 @@ export function studySlidesHtml(session: Session, live: LiveData | null, code: s
     if (a.type === 'section') {
       slides.push(`<section class="slide title"><p class="kicker">Part ${a.number} of ${session.sections.length}</p>
         <h1>${esc(a.title)}</h1>${a.subtitle ? `<p class="muted">${esc(a.subtitle)}</p>` : ''}</section>`);
+    }
+
+    if (a.type === 'table') {
+      slide(kicker, `<h2>${esc(a.title)}</h2><table class="grid">
+        <thead><tr>${a.columns.map((c: string) => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+        <tbody>${a.rows.map((row: string[]) => `<tr>${row.map((c, k) => (k === 0 ? `<th>${rich(c)}</th>` : `<td>${rich(c)}</td>`)).join('')}</tr>`).join('')}</tbody>
+        </table>${a.note ? `<p class="muted">${rich(a.note)}</p>` : ''}`);
+    }
+
+    // Before and after: the hint, the table of changes and what it shows.
+    if (a.type === 'guess' && a.before) {
+      slide(kicker, `<h2>${rich(a.stageText)}</h2>
+        <p>Everyone guessed twice. Before the second guess, only the group “${esc(a.splitOptions[a.hintOption])}” saw a hint: “${rich(a.hint)}”</p>
+        ${live ? changeTable(a, live) : ''}
+        ${a.truth || a.takeaway ? `<div class="answer"><p class="label">What it shows</p>
+          <p>${rich(a.takeaway ?? '')}${a.truth ? ` <span class="muted">True value: ${esc(a.truth.label)}.</span>` : ''}</p></div>` : ''}`);
+      continue;
     }
 
     if (a.type === 'guess') {
@@ -178,7 +210,8 @@ export function examBankHtml(session: Session, live: LiveData, code: string): st
       parts.push(`<p class="q">${rich(a.stageText)}</p><table><tr><th>Group</th><th>Answers</th><th>Median</th></tr>
         ${groups.map((g, i) => `<tr><td>${esc(g.title)}${a.arms.length > 1 && a.arms[i].anchor !== undefined ? ` (saw “${esc(a.arms[i].anchor)}”)` : ''}</td>
           <td>${g.n}</td><td>${g.median === null ? '–' : formatNumber(g.median)}</td></tr>`).join('')}</table>
-        ${a.truth ? `<p class="muted">True value: ${esc(a.truth.label)}</p>` : ''}`);
+        ${a.truth ? `<p class="muted">True value: ${esc(a.truth.label)}</p>` : ''}
+        ${a.before ? `<p class="muted">Hint for “${esc(a.splitOptions[a.hintOption])}” only: “${rich(a.hint)}”. Medians of students who answered both rounds:</p>${changeTable(a, live)}` : ''}`);
     }
     if (a.type === 'choice') {
       const i = item ?? 0;
