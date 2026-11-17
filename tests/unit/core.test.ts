@@ -127,14 +127,14 @@ describe('session files', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (!r.ok) return;
     const { session } = r;
-    expect(session.frames.length).toBe(71);
-    expect(session.sections.length).toBe(5);
+    expect(session.frames.length).toBe(54);
+    expect(session.sections.length).toBe(4);
     expect(session.frames[0].section).toBe(-1);
-    expect(session.frames.at(-1)!.section).toBe(4);
+    expect(session.frames.at(-1)!.section).toBe(3);
     expect(session.exam.length).toBeGreaterThanOrEqual(8);
     // the salary guess is split by the answers to the master question
     expect(session.activities.salary.splitOptions).toEqual(['Yes', 'No', 'Not sure']);
-    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4]);
     // the hint before the first reveal must not say "versions"
     const firstReveal = session.frames.findIndex((f) => f.phase === 'versions');
     expect(nextLabel(session, firstReveal - 1)).toBe('reveal (1 of 3)');
