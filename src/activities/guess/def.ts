@@ -26,11 +26,19 @@
 //                   one group minus the change of the other, with the takeaway)
 //   hint            text that only one group sees on the phone, above the question
 //   hintFor         which group: the option's exact text or its number (1 = first)
+//
+// The bar game (regression discontinuity) needs two guesses. On the second guess:
+//   before          id of the first guess
+//   bar             "median" (the class median of the first guesses) or a number
+//   hint            message shown only on phones whose first guess was above the bar
+// Its phases are open, closed, "scatter" (first against second guess, the bar as a
+// line) and "band" (the students just below and just above the bar, with the takeaway).
 
 import { S } from '../../strings';
 import type { Activity, ActivityDef, EnterContext, FramePatch, LiveData } from '../../core/types';
 import { armOf } from '../../core/identity';
 import { median } from '../../core/stats';
+import { barOf } from '../../core/scatter';
 
 export interface GuessGroup {
   label: string; // "A", or the option text
@@ -120,18 +128,24 @@ export const guessDef: ActivityDef = {
 
   validate(a, v) {
     v.only(a, ['type', 'id', 'stageText', 'stageHint', 'part1', 'part1Options', 'part2', 'arms', 'splitBy',
-      'min', 'max', 'exclusiveMin', 'axis', 'revealHeadline', 'truth', 'takeaway', 'before', 'hint', 'hintFor']);
+      'min', 'max', 'exclusiveMin', 'axis', 'revealHeadline', 'truth', 'takeaway', 'before', 'hint', 'hintFor', 'bar']);
     v.text(a, 'before', { max: 30 });
     v.text(a, 'hint', { max: 200 });
-    if (a.before && !a.splitBy) v.at('before').err('needs "splitBy" as well');
-    if (a.hint && !a.splitBy) v.at('hint').err('needs "splitBy" as well');
-    if (!!a.hint !== (a.hintFor !== undefined)) v.at('hint').err('"hint" and "hintFor" belong together');
+    if (a.bar !== undefined) {
+      if (a.bar !== 'median' && typeof a.bar !== 'number') v.at('bar').err('must be "median" or a number');
+      if (a.splitBy || a.hintFor !== undefined) v.at('bar').err('cannot be combined with "splitBy" or "hintFor"');
+      if (!a.before || !a.hint) v.at('bar').err('needs "before" and "hint" as well');
+    } else {
+      if (a.before && !a.splitBy) v.at('before').err('needs "splitBy" as well');
+      if (a.hint && !a.splitBy) v.at('hint').err('needs "splitBy" as well');
+      if (!!a.hint !== (a.hintFor !== undefined)) v.at('hint').err('"hint" and "hintFor" belong together');
+    }
     v.text(a, 'stageText', { required: true });
     v.text(a, 'stageHint');
     v.text(a, 'part1');
     v.text(a, 'part2', { required: true });
     v.text(a, 'revealHeadline');
-    v.text(a, 'takeaway', { max: 400 });
+    v.text(a, 'takeaway', { max: 500 });
     v.text(a, 'splitBy', { max: 30 });
     v.number(a, 'min');
     v.number(a, 'max');
@@ -192,6 +206,12 @@ export const guessDef: ActivityDef = {
 
   // splitBy must name a choice activity; remember its options for the group labels.
   link(a, activities, v) {
+    if (a.bar !== undefined) {
+      const first = activities[a.before];
+      if (!first || first.type !== 'guess' || first.id === a.id) return v.at('before').err(`"${a.before}" must be another guess activity`);
+      first.paired = true; // simulated students then guess consistently in both rounds
+      return;
+    }
     if (!a.splitBy) return;
     const other = activities[a.splitBy];
     if (!other || other.type !== 'choice') return v.at('splitBy').err(`"${a.splitBy}" must be a choice activity`);
@@ -215,11 +235,13 @@ export const guessDef: ActivityDef = {
   itemCount: () => 0,
 
   phases(a) {
+    if (a.bar !== undefined) return ['open', 'closed', 'scatter', 'band'];
     return ['open', 'closed', ...(a.arms.length > 1 ? ['versions'] : []), 'results',
       ...(a.before ? ['change', 'did'] : []), ...(a.truth ? ['truth'] : [])];
   },
   // A before-and-after guess shows the change first and the plot with the true value last.
   defaultPhases(a) {
+    if (a.bar !== undefined) return this.phases(a);
     if (a.before) return ['open', 'closed', 'change', 'did', ...(a.truth ? ['truth'] : ['results'])];
     return this.phases(a);
   },
@@ -238,6 +260,10 @@ export const guessDef: ActivityDef = {
     const armsPublic = a.arms.map((arm: any) => ({ label: arm.label, anchor: arm.anchor ?? null }));
 
     if (frame.phase === 'open') {
+      // The bar is fixed at the moment the second guess opens, and not moved afterwards.
+      if (a.bar !== undefined && (a.barValue === undefined || live.responses(a.id).length === 0)) {
+        a.barValue = barOf({ ...a, barValue: undefined }, live) ?? undefined;
+      }
       return {
         view: {
           ...base,
@@ -249,7 +275,8 @@ export const guessDef: ActivityDef = {
           max: a.max,
           xmin: a.exclusiveMin,
           // Only phones that gave this answer to the splitBy question show the hint.
-          ...(a.hint ? { hint: a.hint, hintKey: `${a.splitBy}-1`, hintOpt: a.hintOption } : {}),
+          ...(a.bar !== undefined ? { hint: a.hint, bar: a.barValue ?? null }
+            : a.hint ? { hint: a.hint, hintKey: `${a.splitBy}-1`, hintOpt: a.hintOption } : {}),
           ...(a.before ? { beforeKey: a.before } : {}),
         },
         open: { key: a.id, type: 'guess', durationMs: null, min: a.min, max: a.max, xmin: a.exclusiveMin, p1: !!a.part1 },
@@ -260,6 +287,9 @@ export const guessDef: ActivityDef = {
     // versions / results / truth: phones learn which version they had.
     const view = { ...base, part1: a.part1 ?? null, arms: armsPublic };
     if (frame.phase === 'versions') return { view };
+    if (frame.phase === 'scatter' || frame.phase === 'band') {
+      return { view: { ...base, hint: a.hint, bar: barOf(a, live), beforeKey: a.before } };
+    }
     // After the change is on the projector, phones may say whether they had the hint.
     if (frame.phase === 'change' || frame.phase === 'did') {
       return { view: { ...base, hint: a.hint, hintKey: `${a.splitBy}-1`, hintOpt: a.hintOption } };

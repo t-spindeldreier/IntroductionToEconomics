@@ -9,6 +9,7 @@ import { answerCount, type StageEnv, type StageViewFn } from '../../stage/env';
 import { ARM_COLOURS, dotPlot } from '../../stage/plots';
 import { modePill } from '../../ui/pill';
 import { part1Text, signed, summariseChange, summariseGuess } from './def';
+import { scatterSvg, summariseBar, type BarSide } from '../../core/scatter';
 
 /** The neutral question with the answer count. Also used by the lobby. */
 export function guessCollecting(a: Activity, env: StageEnv): HTMLElement {
@@ -23,6 +24,32 @@ export const guessStage: StageViewFn = (env) => {
   const phase = env.frame.phase;
   if (phase === 'open' || phase === 'closed') {
     return h('div', { class: 'view centered' }, phase === 'open' ? modePill('phone') : null, guessCollecting(a, env));
+  }
+
+  // The bar game: first against second guess, then the students next to the bar.
+  if (phase === 'scatter' || phase === 'band') {
+    const s = summariseBar(a, env.ctl);
+    const band = phase === 'band';
+    const plot = h('div', { class: 'scatter-box' });
+    plot.innerHTML = scatterSvg(s, a.axis, band);
+    const card = (i: number, title: string, sub: string, side: BarSide) =>
+      h('div', { class: 'median-card' },
+        h('p', { class: 'version-label' }, h('span', { class: 'swatch', style: `background:${ARM_COLOURS[i]}` }), title),
+        h('p', { class: 'median-value' }, side.median === null ? '–' : formatNumber(side.median)),
+        h('p', { class: 'muted' }, `${S.medianSecond} · ${sub} · ${S.students(side.n)}`));
+    return h('div', { class: 'view' },
+      h('h1', { class: 'headline' }, a.revealHeadline ?? S.barHeadline),
+      h('div', { class: 'scatter-row' }, plot,
+        h('div', { class: 'scatter-side' },
+          h('p', { class: 'kicker' }, S.barMessage, ': “', rich(a.hint), '”'),
+          h('div', { class: 'medians' }, band
+            ? [card(0, S.justBelow, S.noMessage, s.nearBelow), card(1, S.justAbove, S.gotMessage, s.nearAbove)]
+            : [card(0, S.allBelow, S.noMessage, s.below), card(1, S.allAbove, S.gotMessage, s.above)]),
+          band ? h('div', { class: 'answer-card compact' },
+            h('p', { class: 'answer-label' }, S.jumpLabel),
+            h('p', { class: 'answer-main' }, signed(s.jump, formatNumber)),
+            a.takeaway ? h('p', { class: 'answer-text' }, rich(a.takeaway)) : null,
+            a.truth ? h('p', { class: 'muted' }, `${S.trueValue}: ${a.truth.label}`) : null) : null)));
   }
 
   // Before and after: one row per group; the "did" phase adds the subtraction.

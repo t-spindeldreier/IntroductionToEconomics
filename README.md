@@ -239,6 +239,22 @@ guess, second guess and change per group, for students who answered both times) 
 besides `results` and `truth`. Be aware that the hint text travels to every phone and is
 only hidden by the app; a student who inspects the network traffic could read it.
 
+**The bar game (regression discontinuity).** Two guesses of the same quantity. The
+second one has
+
+```yaml
+    before: mal1             # the first guess
+    bar: median              # the class median of the first guesses, or a fixed number
+    hint: "Your first guess was in the upper half of the class."
+```
+
+While the second guess is open, only phones whose own first guess was above the bar
+show the message. The bar is fixed at the moment the second guess opens. The phases are
+`open`, `closed`, `scatter` (first against second guess for every student, the bar as a
+line, medians of all students below and above) and `band` (the students closest to the
+bar on each side, about a third of each side, the jump between their medians, and the
+`takeaway`). The study slides and the exam bank contain the same plot and numbers.
+
 **Table.** `type: table` shows a comparison table on the projector (phones only show
 its title) and in the study slides: `title`, `columns` (2 to 5 headings), `rows` (2 to 8
 lists with one text per column), optional `note`, and `stepwise: true` for one key press
@@ -368,7 +384,7 @@ npm run test:rules    # security rules on the emulator, one block per guarantee
 npm run simulate      # 100 phones and a stage through the whole session; checks the budget
 npm run smoke         # real browser: one stage, three phones, screenshots in smoke-shots/
 node scripts/emu.mjs emulators:exec --only firestore,auth "node scripts/smoke-hint.mjs"
-                      # real browser: the hint game with one phone in each group
+                      # real browser: the hint game and the bar game with one phone on each side
 node scripts/emu.mjs emulators:exec --only firestore,auth "node scripts/preview.mjs sessions/private/week1.yaml"
                       # proof-read a session: every screen with simulated students, in preview-shots/
 npm run build         # type check, build, report the gzipped phone download

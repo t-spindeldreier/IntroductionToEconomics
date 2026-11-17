@@ -7,6 +7,7 @@ import { ADJECTIVES, ECONOMISTS, nickname } from '../../src/core/nicknames';
 import { countOptions, logPosition, median, parseGuess } from '../../src/core/stats';
 import { leaderboard, pointsFor } from '../../src/core/scoring';
 import { compileSession, nextLabel } from '../../src/core/session';
+import { scatterSvg, summariseBar } from '../../src/core/scatter';
 import { toCsv } from '../../src/core/csv';
 import { examBankHtml, studySlidesHtml } from '../../src/core/handout';
 import { summariseChange, summariseGuess } from '../../src/activities/guess/def';
@@ -127,10 +128,10 @@ describe('session files', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (!r.ok) return;
     const { session } = r;
-    expect(session.frames.length).toBe(54);
-    expect(session.sections.length).toBe(4);
+    expect(session.frames.length).toBe(59);
+    expect(session.sections.length).toBe(5);
     expect(session.frames[0].section).toBe(-1);
-    expect(session.frames.at(-1)!.section).toBe(3);
+    expect(session.frames.at(-1)!.section).toBe(4);
     expect(session.exam.length).toBeGreaterThanOrEqual(8);
     // the salary guess is split by the answers to the master question
     expect(session.activities.salary.splitOptions).toEqual(['Yes', 'No', 'Not sure']);
@@ -259,6 +260,52 @@ describe('before and after, and the table', () => {
       g1: { type: 'guess', stageText: 's', part2: 'p' },
       g2: { type: 'guess', stageText: 's', part2: 'p', before: 'g1' } }, steps: ['g1', 'g2'] });
     expect(bad.ok ? '' : bad.errors.join()).toContain('before: needs "splitBy"');
+  });
+});
+
+describe('the bar game', () => {
+  const r = compileSession({
+    title: 't',
+    activities: {
+      g1: { type: 'guess', stageText: 's', part2: 'p' },
+      g2: { type: 'guess', stageText: 's', part2: 'p', before: 'g1', bar: 'median', hint: 'Upper <half>', takeaway: 'Jump.' },
+    },
+    steps: [{ activity: 'g1', phases: ['open', 'closed'] }, 'g2'],
+  });
+  if (!r.ok) throw new Error(r.errors.join());
+  const resp = (key: string, pid: string, v: number) => ({ key, pid, v, at: 0, fake: false });
+  const firsts = [10, 20, 30, 40, 50, 60, 70, 80]; // median 45
+  const seconds = [11, 19, 31, 42, 35, 45, 60, 70]; // above the bar: lower than the first guess
+  const data: Record<string, any[]> = {
+    g1: [...firsts.map((v, i) => resp('g1', 'p' + i, v)), resp('g1', 'gone', 45.5)],
+    g2: [...seconds.map((v, i) => resp('g2', 'p' + i, v)), resp('g2', 'new', 5)],
+  };
+  const live = { responses: (key: string) => data[key] ?? [], participants: new Map(), timing: () => null };
+
+  it('uses the class median as the bar and compares the students next to it', () => {
+    const s = summariseBar(r.session.activities.g2, live);
+    expect(s.bar).toBe(45.5);
+    expect(s.points.length).toBe(8); // only students who answered both rounds
+    expect([s.below.n, s.below.median, s.above.n, s.above.median]).toEqual([4, 25, 4, 52.5]);
+    expect([s.nearBelow.n, s.nearBelow.median, s.nearAbove.n, s.nearAbove.median]).toEqual([3, 31, 3, 45]);
+    expect(s.jump).toBe(14);
+    expect(s.points.filter((p) => p.near).map((p) => p.x).sort()).toEqual([20, 30, 40, 50, 60, 70]);
+  });
+  it('has its own phases and marks the first guess as paired', () => {
+    expect(r.session.frames.filter((f) => f.id === 'g2').map((f) => f.phase)).toEqual(['open', 'closed', 'scatter', 'band']);
+    expect(r.session.activities.g1.paired).toBe(true);
+  });
+  it('draws one dot per student and puts plot and numbers into the handouts', () => {
+    const s = summariseBar(r.session.activities.g2, live);
+    expect(scatterSvg(s, { min: 1, max: 1000 }, true).match(/<circle/g)!.length).toBe(8);
+    const slides = studySlidesHtml(r.session, live, 'ABCD');
+    expect(slides).toContain('<svg');
+    expect(slides).toContain('Upper &lt;half&gt;');
+    expect(examBankHtml(r.session, live, 'ABCD')).toContain('Jump at the bar (45.5)');
+  });
+  it('rejects a bar without a first guess or a message', () => {
+    const bad = compileSession({ title: 't', activities: { g2: { type: 'guess', stageText: 's', part2: 'p', bar: 'median' } }, steps: ['g2'] });
+    expect(bad.ok ? '' : bad.errors.join()).toContain('bar: needs "before" and "hint"');
   });
 });
 

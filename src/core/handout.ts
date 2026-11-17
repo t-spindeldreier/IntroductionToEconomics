@@ -12,6 +12,7 @@
 import type { Activity, LiveData, Session } from './types';
 import { countOptions, formatNumber } from './stats';
 import { armOf } from './identity';
+import { scatterSvg, summariseBar } from './scatter';
 import { summariseChange, summariseGuess, part1Text, signed } from '../activities/guess/def';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -52,6 +53,8 @@ const STYLE = `
   .grid thead th { font-size: .8em; text-transform: uppercase; letter-spacing: .04em; color: #5a6270; }
   .grid tbody th { color: #14304f; }
   .grid.numbers { font-size: 1em; } .grid.numbers td { font-weight: 800; font-size: 1.3em; }
+  svg.scatter { max-height: 19em; max-width: 100%; }
+  .doc svg.scatter { max-height: 26rem; display: block; }
   .cols { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1.2em; }
   .box { padding: .7em 1em; background: #fff; border: .2em solid #0072b2; border-radius: .7em; display: flex; flex-direction: column; gap: .3em; }
   .box.g1 { border-color: #d55e00; } .box.g2 { border-color: #16181d; } .box.g3 { border-color: #6b7280; }
@@ -101,6 +104,17 @@ function changeTable(a: Activity, live: Pick<LiveData, 'responses'>): string {
     <tr><th>Difference in differences</th><td></td><td></td><td>${signed(did, formatNumber)}</td></tr></tbody></table>`;
 }
 
+/** The bar game in numbers (for a guess with "bar"). */
+function barTable(a: Activity, live: Pick<LiveData, 'responses'>): string {
+  const s = summariseBar(a, live);
+  const num = (x: number | null) => (x === null ? '–' : formatNumber(x));
+  const row = (name: string, side: { n: number; median: number | null }) => `<tr><th>${name}</th><td>${side.n}</td><td>${num(side.median)}</td></tr>`;
+  return `<table class="grid"><thead><tr><th>First guess</th><th>Students</th><th>Median second guess</th></tr></thead><tbody>
+    ${row('All below the bar (no message)', s.below)}${row('All above the bar (got the message)', s.above)}
+    ${row('Just below the bar', s.nearBelow)}${row('Just above the bar', s.nearAbove)}
+    <tr><th>Jump at the bar (${num(s.bar)})</th><td></td><td>${signed(s.jump, formatNumber)}</td></tr></tbody></table>`;
+}
+
 /** Shares of the options of a choice item within each arm of an experiment (the balance check). */
 export function sharesByArm(choice: Activity, key: string, guess: Activity, live: Pick<LiveData, 'responses'>) {
   const options: string[] = choice.items[0].options ?? choice.options;
@@ -131,6 +145,17 @@ export function studySlidesHtml(session: Session, live: LiveData | null, code: s
         <thead><tr>${a.columns.map((c: string) => `<th>${esc(c)}</th>`).join('')}</tr></thead>
         <tbody>${a.rows.map((row: string[]) => `<tr>${row.map((c, k) => (k === 0 ? `<th>${rich(c)}</th>` : `<td>${rich(c)}</td>`)).join('')}</tr>`).join('')}</tbody>
         </table>${a.note ? `<p class="muted">${rich(a.note)}</p>` : ''}`);
+    }
+
+    // The bar game: the scatter plot, the numbers and what it shows.
+    if (a.type === 'guess' && a.bar !== undefined) {
+      slide(kicker, `<h2>${rich(a.stageText)}</h2>
+        <div class="cols">${live ? scatterSvg(summariseBar(a, live), a.axis, true) : ''}<div>
+        <p>Everyone guessed twice. Before the second guess, only phones whose first guess was above the bar
+          (${a.bar === 'median' ? 'the class median' : formatNumber(a.bar)}) showed: “${rich(a.hint)}”</p>
+        ${live ? barTable(a, live) : ''}</div></div>
+        ${a.takeaway ? `<div class="answer"><p class="label">What it shows</p><p>${rich(a.takeaway)}${a.truth ? ` <span class="muted">True value: ${esc(a.truth.label)}.</span>` : ''}</p></div>` : ''}`);
+      continue;
     }
 
     // Before and after: the hint, the table of changes and what it shows.
@@ -211,7 +236,8 @@ export function examBankHtml(session: Session, live: LiveData, code: string): st
         ${groups.map((g, i) => `<tr><td>${esc(g.title)}${a.arms.length > 1 && a.arms[i].anchor !== undefined ? ` (saw “${esc(a.arms[i].anchor)}”)` : ''}</td>
           <td>${g.n}</td><td>${g.median === null ? '–' : formatNumber(g.median)}</td></tr>`).join('')}</table>
         ${a.truth ? `<p class="muted">True value: ${esc(a.truth.label)}</p>` : ''}
-        ${a.before ? `<p class="muted">Hint for “${esc(a.splitOptions[a.hintOption])}” only: “${rich(a.hint)}”. Medians of students who answered both rounds:</p>${changeTable(a, live)}` : ''}`);
+        ${a.bar !== undefined ? `<p class="muted">Message above the bar only: “${rich(a.hint)}”. Students who answered both rounds:</p>${barTable(a, live)}${scatterSvg(summariseBar(a, live), a.axis, true)}` : ''}
+        ${a.before && a.splitBy ? `<p class="muted">Hint for “${esc(a.splitOptions[a.hintOption])}” only: “${rich(a.hint)}”. Medians of students who answered both rounds:</p>${changeTable(a, live)}` : ''}`);
     }
     if (a.type === 'choice') {
       const i = item ?? 0;

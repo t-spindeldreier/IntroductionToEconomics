@@ -22,6 +22,23 @@ export function fakeAnswer(a: Activity, frame: Frame, open: OpenWindow, pid: str
     ? Math.min(2000 + rand() * rand() * open.durationMs, open.durationMs * 0.9)
     : 800 + rand() * 11000;
 
+  // The bar game: a simulated student guesses consistently in both rounds, and
+  // lowers the second guess after seeing the message.
+  if (a.type === 'guess' && (a.paired || a.bar !== undefined)) {
+    const seed = a.bar !== undefined ? a.before : a.id;
+    const u = (k: number) => (armOf(pid, `bot-${seed}-${k}`, 10007) + 0.5) / 10007;
+    const z = (u(1) + u(2) + u(3) - 1.5) * 2; // roughly standard normal, fixed per student
+    const tidy = (x: number) => {
+      let v = Math.min(a.max, Math.max(a.exclusiveMin ? a.min + 0.5 : a.min, x));
+      v = v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
+      return a.exclusiveMin && v <= a.min ? a.min + 1 : v;
+    };
+    const firstGuess = tidy(Math.sqrt(a.axis.min * a.axis.max) * Math.exp(0.7 * z));
+    if (a.bar === undefined) return { delayMs, v: firstGuess };
+    const pulled = typeof a.barValue === 'number' && firstGuess > a.barValue ? 0.65 : 1;
+    return { delayMs, v: tidy(firstGuess * pulled * Math.exp(0.12 * normal(rand))) };
+  }
+
   if (a.type === 'guess') {
     const anchor = Number(a.arms[armOf(pid, a.id, a.arms.length)].anchor);
     // Without a true value, aim at the middle of the plot's axis.

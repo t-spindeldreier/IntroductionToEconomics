@@ -1,5 +1,5 @@
-// Browser check of the hint game (before-and-after guess): two real phones, one in
-// each group. Only the phone in the hinted group may show the hint, and the stage
+// Browser check of the hint game (before-and-after guess) and of the bar game
+// (regression discontinuity): two real phones, one in each group. Only the phone in the hinted group may show the hint, and the stage
 // must compute the difference in differences from the two rounds.
 //
 //   node scripts/emu.mjs emulators:exec --only firestore,auth "node scripts/smoke-hint.mjs"
@@ -26,8 +26,12 @@ writeFileSync(file, JSON.stringify({
     g1: { type: 'guess', stageText: 'How many?', part2: 'About ___ thousand.' },
     g2: { type: 'guess', stageText: 'Again: how many?', part2: 'About ___ thousand.', splitBy: 'side', before: 'g1',
       hint: 'SECRETHINT fewer than 500', hintFor: 'Front half', takeaway: 'Subtract.' },
+    b1: { type: 'guess', stageText: 'How many millions?', part2: 'About ___ million.' },
+    b2: { type: 'guess', stageText: 'Again: how many millions?', part2: 'About ___ million.', before: 'b1', bar: 'median',
+      hint: 'BARMESSAGE upper half', takeaway: 'Jump.' },
   },
-  steps: ['lobby', { activity: 'side', phases: ['open', 'closed'] }, { activity: 'g1', phases: ['open', 'closed'] }, 'g2'],
+  steps: ['lobby', { activity: 'side', phases: ['open', 'closed'] }, { activity: 'g1', phases: ['open', 'closed'] }, 'g2',
+    { activity: 'b1', phases: ['open', 'closed'] }, 'b2'],
 }));
 
 const server = await createServer({ server: { port: 5197, strictPort: true }, logLevel: 'error' });
@@ -113,6 +117,36 @@ try {
   await back.getByText('Your group got no hint').waitFor();
   await front.getByText('Your group got a hint').waitFor();
   check(!(await back.textContent('body')).includes('SECRETHINT'), 'after the reveal the back half still does not see the hint text on its phone');
+
+  // ----- the bar game: the phone that guessed higher is above the class median -----
+  await next(); // g2: results
+  await next(); // b1: open
+  await front.waitForSelector('.guess-input');
+  await back.waitForSelector('.guess-input');
+  await guess(front, '10');
+  await guess(back, '30');
+  await next(); // b1: closed
+  await next(); // b2: open
+  await front.waitForSelector('.guess-input');
+  await back.waitForSelector('.guess-input');
+  check((await back.textContent('body')).includes('BARMESSAGE'), 'the phone above the bar shows the message');
+  check(!(await front.textContent('body')).includes('BARMESSAGE'), 'the phone below the bar shows no message');
+  check(!(await stage.textContent('.stage')).includes('BARMESSAGE'), 'the stage does not show the message while collecting');
+  await back.screenshot({ path: `${OUT}/bar-phone-above.png` });
+  await guess(front, '12');
+  await guess(back, '20');
+  await next(); // b2: closed
+  await next(); // b2: scatter
+  await stage.waitForSelector('.scatter circle');
+  check((await stage.locator('.scatter circle').count()) === 2, 'the scatter plot has one dot per phone');
+  check((await stage.textContent('.scatter')).includes('the bar: 20'), 'the bar is the median of the first guesses (20)');
+  await next(); // b2: band
+  await stage.waitForSelector('.answer-main');
+  const jump = (await stage.textContent('.answer-main')).trim();
+  check(jump === '+8', `the stage shows the jump at the bar (${jump})`);
+  await stage.screenshot({ path: `${OUT}/bar-stage-band.png` });
+  await back.getByText('Your first guess was above the bar').waitFor();
+  await front.getByText('Your first guess was below the bar').waitFor();
   check(errors.length === 0, `no page errors ${errors.join('; ')}`);
 } catch (e) {
   failures.push(String(e));

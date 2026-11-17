@@ -13,13 +13,20 @@ export const guessPhone: PhoneViewFn = (view, env) => {
   const arm = arms.length ? arms[armOf(env.me.pid, key, arms.length)] : null;
   const answer = env.client.answers[key];
   // A hint that only one group gets: decided by this phone's own answer to another question.
-  const hinted = view.hint !== undefined && env.client.answers[String(view.hintKey)]?.v === view.hintOpt;
+  // Or (the bar game) by whether its own first guess was above the bar.
+  const first = view.beforeKey ? env.client.answers[String(view.beforeKey)] : undefined;
+  const byBar = 'bar' in view;
+  const counted = first !== undefined && first.state !== 'late';
+  const hinted = view.hint !== undefined && (byBar
+    ? counted && typeof view.bar === 'number' && first.v > view.bar
+    : env.client.answers[String(view.hintKey)]?.v === view.hintOpt);
 
   // After the reveal has started, the phone may say which version it had.
   if (view.phase !== 'open') {
     const revealed = view.phase !== 'closed' && arm && arms.length > 1;
     return waiting(
-      view.hint !== undefined ? h('p', { class: 'badge' }, hinted ? S.youHadHint : S.youHadNoHint) : null,
+      view.hint === undefined || (byBar && !counted) ? null
+        : h('p', { class: 'badge' }, byBar ? (hinted ? S.aboveBar : S.belowBar) : hinted ? S.youHadHint : S.youHadNoHint),
       hinted ? h('p', { class: 'quote' }, rich(String(view.hint))) : null,
       revealed ? h('p', { class: 'badge' }, S.youHadVersion(arm.label)) : null,
       revealed && view.part1 ? h('p', { class: 'quote' }, rich(part1Text(view, arm.anchor))) : null,
@@ -34,7 +41,6 @@ export const guessPhone: PhoneViewFn = (view, env) => {
   }
 
   const draft = (env.draft[key] ??= {}) as { p1?: number; text?: string };
-  const first = view.beforeKey ? env.client.answers[String(view.beforeKey)] : undefined;
 
   // Part 1: more or less than the anchor?
   if (view.part1 && draft.p1 === undefined) {
