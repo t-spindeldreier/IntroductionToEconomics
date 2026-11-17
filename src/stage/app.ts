@@ -52,7 +52,8 @@ export function startStage(el: HTMLElement): void {
 }
 
 function page(...children: (Node | string | null)[]): HTMLElement {
-  return h('div', { class: 'host-page' }, h('h1', null, S.appName), ...children);
+  return h('div', { class: 'host-page' }, h('h1', null, S.appName), ...children,
+    h('p', { class: 'muted build-label' }, `${S.version} ${__BUILD__}`));
 }
 
 async function route(): Promise<void> {

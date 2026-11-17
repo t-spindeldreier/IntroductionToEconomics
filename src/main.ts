@@ -12,6 +12,27 @@ import { NOT_CONFIGURED } from './data/firebase';
 import { ROOM_CODE_PATTERN } from './core/identity';
 import { startLanding, startPhone } from './phone/app';
 
+/**
+ * Browsers and GitHub Pages keep the page for a while after a new version is
+ * deployed. The host must never work with an old copy (it would reject newer
+ * session files), so the stage asks the server which version is current and, if
+ * it is older, loads the page again under an address the cache has not seen.
+ */
+async function isCurrent(): Promise<boolean> {
+  if (import.meta.env.DEV) return true;
+  try {
+    const response = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const { build } = await response.json();
+    const query = new URLSearchParams(location.search);
+    if (build === __BUILD__ || query.get('v') === build) return true; // current, or already tried once
+    query.set('v', build);
+    location.replace(`${location.pathname}?${query}${location.hash}`);
+    return false;
+  } catch {
+    return true; // offline or no version file: carry on with what we have
+  }
+}
+
 const root = document.getElementById('app')!;
 const code = (new URLSearchParams(location.search).get('r') ?? '').toUpperCase();
 const onStage = () => location.hash.startsWith('#/stage');
@@ -21,7 +42,7 @@ if (NOT_CONFIGURED) {
     h('h1', null, 'Not configured yet'),
     h('p', null, 'Paste your Firebase web configuration into src/firebase-config.ts and deploy again (see README).')))));
 } else if (onStage()) {
-  void import('./stage/app').then((m) => m.startStage(root));
+  void isCurrent().then((ok) => { if (ok) void import('./stage/app').then((m) => m.startStage(root)); });
 } else if (ROOM_CODE_PATTERN.test(code)) {
   startPhone(root, code);
 } else {
