@@ -63,6 +63,9 @@ export function fakeAnswer(a: Activity, frame: Frame, open: OpenWindow, pid: str
     return { delayMs, v, ...(a.part1 ? { p1: v > anchor ? 0 : 1 } : {}) };
   }
 
+  // birthday lottery: 195 of 366 birthdays were called up
+  if (a.type === 'lottery') return { delayMs, v: rand() < 195 / 366 ? 0 : 1 };
+
   // choice
   const n = open.n ?? 2;
   const correct: number | null = a.items[frame.item ?? 0].correct;

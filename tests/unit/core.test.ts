@@ -128,14 +128,13 @@ describe('session files', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (!r.ok) return;
     const { session } = r;
-    expect(session.frames.length).toBe(60);
-    expect(session.sections.length).toBe(5);
-    expect(session.frames[0].section).toBe(-1);
-    expect(session.frames.at(-1)!.section).toBe(4);
+    expect(session.sections.length).toBe(4);
+    expect(session.frames[0].type).toBe('picture');
+    expect(session.frames.at(-1)!.section).toBe(3);
     expect(session.exam.length).toBeGreaterThanOrEqual(8);
-    // the salary guess is split by the answers to the master question
-    expect(session.activities.salary.splitOptions).toEqual(['Yes', 'No', 'Not sure']);
-    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 3, 4]);
+    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 0, 1]);
+    // the earnings chart first shows only the years before the lottery
+    expect(session.frames.filter((f) => f.id === 'gap').map((f) => f.phase)).toEqual(['part', 'all']);
     // the hint before the first reveal must not say "versions"
     const firstReveal = session.frames.findIndex((f) => f.phase === 'versions');
     expect(nextLabel(session, firstReveal - 1)).toBe('reveal (1 of 3)');
@@ -260,6 +259,23 @@ describe('before and after, and the table', () => {
       g1: { type: 'guess', stageText: 's', part2: 'p' },
       g2: { type: 'guess', stageText: 's', part2: 'p', before: 'g1' } }, steps: ['g1', 'g2'] });
     expect(bad.ok ? '' : bad.errors.join()).toContain('before: needs "splitBy"');
+  });
+});
+
+describe('lottery and chart', () => {
+  it('has a number for each of the 366 birthdays', async () => {
+    const { DRAFT_1969 } = await import('../../src/activities/lottery/draft1969');
+    expect(DRAFT_1969.map((m) => m.length)).toEqual([31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]);
+    expect(DRAFT_1969.flat().sort((a, b) => a - b)).toEqual(Array.from({ length: 366 }, (_, i) => i + 1));
+    expect(DRAFT_1969[8][13]).toBe(1); // 14 September was drawn first
+  });
+  it('draws only the bars that are shown, with negative values and a marker', async () => {
+    const { barChartSvg } = await import('../../src/core/chart');
+    const c = { labels: ['a', 'b', 'c'], values: [1, -200, 30], prefix: '$', marker: { after: 'a', text: 'then' } };
+    expect(barChartSvg(c).match(/<rect/g)!.length).toBe(3);
+    expect(barChartSvg(c, 1).match(/<rect/g)!.length).toBe(1);
+    expect(barChartSvg(c)).toContain('−$200');
+    expect(barChartSvg(c)).toContain('then');
   });
 });
 

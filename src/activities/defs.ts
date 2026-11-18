@@ -10,6 +10,8 @@ import { choiceDef } from './choice/def';
 import { promptDef } from './prompt/def';
 import { lobbyDef, podiumDef, endDef, pictureDef, sectionDef } from './simple/def';
 import { tableDef } from './table/def';
+import { chartDef } from './chart/def';
+import { lotteryDef } from './lottery/def';
 
 export const defs: Record<string, ActivityDef> = {
   lobby: lobbyDef,
@@ -18,6 +20,8 @@ export const defs: Record<string, ActivityDef> = {
   prompt: promptDef,
   table: tableDef,
   picture: pictureDef,
+  chart: chartDef,
+  lottery: lotteryDef,
   podium: podiumDef,
   section: sectionDef,
   end: endDef,

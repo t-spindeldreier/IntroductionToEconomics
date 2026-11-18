@@ -255,6 +255,20 @@ line, medians of all students below and above) and `band` (the students closest 
 bar on each side, about a third of each side, the jump between their medians, and the
 `takeaway`). The study slides and the exam bank contain the same plot and numbers.
 
+**Birthday lottery.** `type: lottery` with a `text` (and optionally `cutoff`, default
+195, and `takeaway`): every student picks day and month of their birthday, and the
+phone shows the number that birthday drew in the US draft lottery of 1 December 1969
+and whether it was called up. The birthday and the number never leave the phone; only
+"called up" or "not called" is sent. The reveal shows how many of the room were called.
+
+**Chart.** `type: chart` draws a bar chart from numbers in the session file, for example
+the results of a published study: `title`, `labels`, `values` (may be negative),
+optional `prefix`/`suffix` ("$", "%"), `marker: { after: label, text }` for a dashed line,
+`highlight` (labels whose value is written out), `takeaway` and `source`. With
+`revealFrom: label` the chart has two phases: `part` shows only the bars before that
+label (under `partTitle`), `all` shows everything, so you can ask for a prediction in
+between.
+
 **Picture.** `type: picture` with `image: file.jpg` shows one figure as large as the
 projector allows, for example as the opening slide before the lobby. Select the image
 file together with the session file, as for other figures.

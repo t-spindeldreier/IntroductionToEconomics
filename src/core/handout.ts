@@ -13,6 +13,7 @@ import type { Activity, LiveData, Session } from './types';
 import { countOptions, formatNumber } from './stats';
 import { armOf } from './identity';
 import { scatterSvg, summariseBar } from './scatter';
+import { barChartSvg } from './chart';
 import { summariseChange, summariseGuess, part1Text, signed } from '../activities/guess/def';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -53,6 +54,7 @@ const STYLE = `
   .grid thead th { font-size: .8em; text-transform: uppercase; letter-spacing: .04em; color: #5a6270; }
   .grid tbody th { color: #14304f; }
   .grid.numbers { font-size: 1em; } .grid.numbers td { font-weight: 800; font-size: 1.3em; }
+  svg.barchart { max-height: 17em; max-width: 100%; }
   svg.scatter { max-height: 19em; max-width: 100%; }
   .doc svg.scatter { max-height: 26rem; display: block; }
   .cols { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1.2em; }
@@ -88,7 +90,7 @@ function* questions(session: Session): Generator<{ activity: Activity; item: num
     }
     const activity = session.activities[frame.collect ?? frame.id];
     const key = frame.collect ?? frame.key;
-    if (done.has(key) || !['guess', 'choice', 'prompt', 'table'].includes(activity.type)) continue;
+    if (done.has(key) || !['guess', 'choice', 'prompt', 'table', 'chart', 'lottery'].includes(activity.type)) continue;
     done.add(key);
     yield { activity, item: frame.collect ? null : frame.item, key, part };
   }
@@ -138,6 +140,20 @@ export function studySlidesHtml(session: Session, live: LiveData | null, code: s
     if (a.type === 'section') {
       slides.push(`<section class="slide title"><p class="kicker">Part ${a.number} of ${session.sections.length}</p>
         <h1>${esc(a.title)}</h1>${a.subtitle ? `<p class="muted">${esc(a.subtitle)}</p>` : ''}</section>`);
+    }
+
+    if (a.type === 'chart') {
+      slide(kicker, `<h2>${esc(a.title)}</h2>${barChartSvg(a as any)}
+        ${a.takeaway ? `<div class="answer"><p class="label">What it shows</p><p>${rich(a.takeaway)}</p></div>` : ''}
+        ${a.source ? `<p class="muted">Source: ${esc(a.source)}</p>` : ''}`);
+    }
+
+    if (a.type === 'lottery') {
+      const answers = live ? live.responses(key).map((r) => r.v) : [];
+      const called = answers.filter((v) => v === 0).length;
+      slide(kicker, `<h2>${rich(a.text)}</h2>
+        ${answers.length ? `<p class="big">${called} of ${answers.length}</p><p class="muted">students in class had a birthday with a number from 1 to ${a.cutoff} and would have been called up</p>` : ''}
+        ${a.takeaway ? `<div class="answer"><p class="label">What it shows</p><p>${rich(a.takeaway)}</p></div>` : ''}`);
     }
 
     if (a.type === 'table') {

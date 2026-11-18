@@ -1,5 +1,5 @@
-// Browser check of the hint game (before-and-after guess) and of the bar game
-// (regression discontinuity): two real phones, one in each group. Only the phone in the hinted group may show the hint, and the stage
+// Browser check of the birthday lottery, the hint game (before-and-after guess) and
+// the bar game (regression discontinuity): two real phones, one in each group. Only the phone in the hinted group may show the hint, and the stage
 // must compute the difference in differences from the two rounds.
 //
 //   node scripts/emu.mjs emulators:exec --only firestore,auth "node scripts/smoke-hint.mjs"
@@ -22,6 +22,7 @@ const file = path.join(os.tmpdir(), 'econ-live-hint.json');
 writeFileSync(file, JSON.stringify({
   title: 'Hint game check',
   activities: {
+    draft: { type: 'lottery', text: 'Which number did your birthday draw?' },
     side: { type: 'choice', question: 'Where?', options: ['Front half', 'Back half'], items: [{ text: 'Where are you sitting?' }] },
     g1: { type: 'guess', stageText: 'How many?', part2: 'About ___ thousand.' },
     g2: { type: 'guess', stageText: 'Again: how many?', part2: 'About ___ thousand.', splitBy: 'side', before: 'g1',
@@ -30,7 +31,7 @@ writeFileSync(file, JSON.stringify({
     b2: { type: 'guess', stageText: 'Again: how many millions?', part2: 'About ___ million.', before: 'b1', bar: 'median',
       hint: 'BARMESSAGE upper half', takeaway: 'Jump.' },
   },
-  steps: ['lobby', { activity: 'side', phases: ['open', 'closed'] }, { activity: 'g1', phases: ['open', 'closed'] }, 'g2',
+  steps: ['lobby', 'draft', { activity: 'side', phases: ['open', 'closed'] }, { activity: 'g1', phases: ['open', 'closed'] }, 'g2',
     { activity: 'b1', phases: ['open', 'closed'] }, 'b2'],
 }));
 
@@ -81,6 +82,22 @@ try {
     await page.locator('button[type=submit]').tap();
     await page.getByText('Received').waitFor();
   };
+
+  // ----- the birthday lottery: 14 September drew number 1, 1 January number 305 -----
+  await next(); // draft: open
+  for (const [page, day, month] of [[front, '14', '8'], [back, '1', '0']]) {
+    await page.waitForSelector('select.pick');
+    await page.selectOption('select[aria-label=Day]', day);
+    await page.selectOption('select[aria-label=Month]', month);
+    await page.locator('button[type=submit]').tap();
+    await page.getByText('Received').waitFor();
+  }
+  check((await front.textContent('.big-value')).trim() === '1' && (await front.textContent('body')).includes('Called up'), 'a birthday on 14 September gets number 1 and is called up');
+  check((await back.textContent('.big-value')).trim() === '305' && (await back.textContent('body')).includes('Not called'), 'a birthday on 1 January gets number 305 and is not called');
+  await front.screenshot({ path: `${OUT}/lottery-phone.png` });
+  await next(); // draft: reveal
+  await stage.getByText('1 of 2 in this room would have been called up (50%).').waitFor();
+  check(true, 'the stage counts 1 of 2 called up');
 
   await next(); // side: open
   await front.getByRole('button', { name: /Front half/ }).tap();

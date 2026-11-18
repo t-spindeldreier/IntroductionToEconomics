@@ -121,6 +121,7 @@ strong { font-weight: 700; }
   display: inline-block; align-self: center; padding: 0.35rem 0.9rem;
   color: var(--brand); background: var(--brand-soft); border-radius: 999px; font-weight: 700;
 }
+.pick { flex: 1; min-width: 0; font: inherit; font-size: 1.15rem; padding: 0.8rem 0.6rem; border: 2px solid var(--brand); border-radius: 12px; background: #fff; color: inherit; }
 .hint-box { border-left: 6px solid var(--brand); font-weight: 700; }
 .quote { font-size: 1.1rem; padding: 0.75rem; background: var(--paper); border-radius: 12px; text-align: left; }
 .reveal-text {
