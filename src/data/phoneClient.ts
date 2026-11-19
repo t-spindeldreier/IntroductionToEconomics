@@ -5,7 +5,8 @@
 // reads the leaderboard document once per reveal, and never queries a collection.
 
 import {
-  doc, getDoc, onSnapshot, serverTimestamp, setDoc, type Firestore, type Unsubscribe,
+  disableNetwork, doc, enableNetwork, getDoc, getDocFromServer, onSnapshot, serverTimestamp, setDoc,
+  type DocumentSnapshot, type Firestore, type Unsubscribe,
 } from 'firebase/firestore';
 import type { PhoneView, RoomState } from '../core/types';
 import { pidOf, randomSecret } from '../core/identity';
@@ -78,6 +79,10 @@ export class PhoneClient {
   private boardTag = '';
   private joining = false;
   private recovered = false;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private checking = false;
+  /** How often the live connection was found to be behind. After the first time, checks come faster. */
+  private timesBehind = 0;
 
   constructor(
     private db: Firestore,
@@ -101,35 +106,97 @@ export class PhoneClient {
     this.unsubscribe = onSnapshot(
       doc(this.db, 'rooms', this.code),
       { includeMetadataChanges: true },
-      (snap) => {
-        this.online = !snap.metadata.fromCache;
-        if (!snap.exists()) {
-          // A missing room that only comes from the offline cache is not conclusive.
-          if (!snap.metadata.fromCache) this.status = 'missing';
-          return this.emit();
-        }
-        const room = { ...fromFs(snap.data({ serverTimestamps: 'estimate' })), code: this.code } as RoomState;
-        if (!snap.metadata.fromCache && room.seq !== this.lastSeq) {
-          this.meter.reads++;
-          // A live update that directly follows the previous one carries a fresh server time.
-          if (this.lastSeq !== null && room.seq === this.lastSeq + 1) this.clock.sample(room.updatedAt);
-          this.lastSeq = room.seq;
-        }
-        this.room = room;
-        this.status = 'ready';
-        this.emit();
-        void this.afterRoomUpdate();
-      },
+      (snap) => this.applyRoom(snap),
       () => {
         this.online = false;
         this.emit();
       },
     );
+    this.watchConnection();
+  }
+
+  private applyRoom(snap: DocumentSnapshot): void {
+    this.online = !snap.metadata.fromCache;
+    if (!snap.exists()) {
+      // A missing room that only comes from the offline cache is not conclusive.
+      if (!snap.metadata.fromCache) this.status = 'missing';
+      return this.emit();
+    }
+    const room = { ...fromFs(snap.data({ serverTimestamps: 'estimate' })), code: this.code } as RoomState;
+    // Never go back to an older state (a late live update after a newer check).
+    if (this.room && room.createdAt === this.room.createdAt && room.seq < this.room.seq) return;
+    if (!snap.metadata.fromCache && room.seq !== this.lastSeq) {
+      this.meter.reads++;
+      // A live update that directly follows the previous one carries a fresh server time.
+      if (this.lastSeq !== null && room.seq === this.lastSeq + 1) this.clock.sample(room.updatedAt);
+      this.lastSeq = room.seq;
+    }
+    this.room = room;
+    this.status = 'ready';
+    this.emit();
+    void this.afterRoomUpdate();
+  }
+
+  // ---------- staying up to date ----------
+  //
+  // The live connection can fall silent without anyone noticing: a phone that was
+  // locked or in another app, Safari on iOS, a flaky Wi-Fi. So the phone also asks
+  // the server directly for the room: whenever the page comes back to the front, and
+  // every 30 seconds while it is visible. If such a check finds something newer than
+  // the live connection delivered, the connection is restarted and the checks come
+  // every 6 seconds from then on. Cost: one read per check.
+
+  static CHECK_MS = 30_000;
+  static CHECK_FAST_MS = 6_000;
+
+  private watchConnection(): void {
+    if (typeof document !== 'undefined') {
+      const wake = () => { if (!document.hidden) void this.checkNow(); };
+      document.addEventListener('visibilitychange', wake);
+      window.addEventListener('pageshow', wake);
+      window.addEventListener('online', wake);
+    }
+    const tick = () => {
+      this.pollTimer = setTimeout(async () => {
+        if (!this.unsubscribe) return;
+        if (typeof document === 'undefined' || !document.hidden) await this.checkNow();
+        tick();
+      }, this.timesBehind > 0 ? PhoneClient.CHECK_FAST_MS : PhoneClient.CHECK_MS);
+      (this.pollTimer as any).unref?.(); // never keeps a Node script (the simulation) alive
+    };
+    tick();
+  }
+
+  /** Ask the server for the room, bypassing the live connection. */
+  async checkNow(): Promise<void> {
+    if (this.checking || !this.unsubscribe || this.status === 'missing') return;
+    this.checking = true;
+    try {
+      const snap = await getDocFromServer(doc(this.db, 'rooms', this.code));
+      this.meter.reads++;
+      const seq = snap.exists() ? (snap.data().seq as number) : null;
+      if (seq !== null && this.room && seq > this.room.seq) {
+        // Give the live connection a moment: it may just be a little slower than this check.
+        await new Promise((r) => setTimeout(r, 1500));
+        if (!this.room || this.room.seq >= seq) return;
+        // It really missed something: show it now and restart the connection.
+        this.timesBehind++;
+        this.lastSeq = seq;
+        this.applyRoom(snap);
+        await disableNetwork(this.db);
+        await enableNetwork(this.db);
+      }
+    } catch {
+      /* offline: the live connection reports that by itself */
+    } finally {
+      this.checking = false;
+    }
   }
 
   stop(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    if (this.pollTimer) clearTimeout(this.pollTimer);
   }
 
   now(): number {
