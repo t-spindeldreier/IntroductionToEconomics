@@ -203,7 +203,8 @@
 .view:has(.compare-table) .headline { font-size: 3vw; }
 .compare-table th, .compare-table td { padding: 0.65vw 1.2vw; text-align: left; vertical-align: top; border-bottom: 0.15vw solid var(--line, #d8d5cc); }
 .compare-table thead th { font-size: 1.2vw; color: var(--ink-2); letter-spacing: 0.04em; text-transform: uppercase; }
-.compare-table tbody th { font-weight: 800; color: var(--brand); width: 21%; }
+.compare-table tbody th { font-weight: 800; color: var(--brand); }
+.compare-table thead th:first-child { width: 21%; } /* the layout is fixed, so the header row sets the widths */
 .compare-table tr.hidden-row > * { visibility: hidden; }
 .compare-table tr.new-row { background: var(--good-soft); }
 

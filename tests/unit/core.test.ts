@@ -132,7 +132,7 @@ describe('session files', () => {
     expect(session.frames[0].type).toBe('picture');
     expect(session.frames.at(-1)!.section).toBe(3);
     expect(session.exam.length).toBeGreaterThanOrEqual(8);
-    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 1, 0, 2]);
+    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([2, 0, 1, 3, 2]);
     expect(session.frames.filter((f) => f.id === 'burger').map((f) => f.phase)).toEqual(['assign', 'news', 'open', 'closed', 'class', 'real', 'best']);
     // the hint before the first reveal must not say "versions"
     const firstReveal = session.frames.findIndex((f) => f.phase === 'versions');
