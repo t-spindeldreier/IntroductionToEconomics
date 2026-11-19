@@ -167,8 +167,8 @@ function embedImages(raw: any, images: Map<string, string>): string[] {
   if (typeof raw !== 'object' || raw === null) return errors;
   raw.images = {};
   for (const a of Object.values<any>(raw.activities ?? {})) {
-    for (const field of ['image', 'revealImage']) {
-      const name = a?.[field];
+    const names = [a?.image, a?.revealImage, ...(Array.isArray(a?.images) ? a.images.map((im: any) => im?.file) : [])];
+    for (const name of names) {
       if (typeof name !== 'string') continue;
       const data = images.get(name.split(/[\\/]/).pop()!.toLowerCase());
       if (data) raw.images[name] = data; // stored once, even if shown twice

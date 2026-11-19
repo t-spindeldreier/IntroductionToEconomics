@@ -55,6 +55,9 @@ const STYLE = `
   .grid thead th { font-size: .8em; text-transform: uppercase; letter-spacing: .04em; color: #5a6270; }
   .grid tbody th { color: #14304f; }
   .grid.numbers { font-size: 1em; } .grid.numbers td { font-weight: 800; font-size: 1.3em; }
+  .gallery { display: flex; gap: 1.2em; align-items: flex-start; min-height: 0; }
+  .gallery figure { margin: 0; flex: 1; min-width: 0; text-align: center; font-size: .75em; color: #5a6270; }
+  .gallery img { max-width: 100%; max-height: 15em; object-fit: contain; border-radius: .3em; }
   svg.barchart { max-height: 17em; max-width: 100%; }
   svg.scatter { max-height: 19em; max-width: 100%; }
   .doc svg.scatter { max-height: 26rem; display: block; }
@@ -91,7 +94,7 @@ function* questions(session: Session): Generator<{ activity: Activity; item: num
     }
     const activity = session.activities[frame.collect ?? frame.id];
     const key = frame.collect ?? frame.key;
-    if (done.has(key) || !['guess', 'choice', 'prompt', 'table', 'chart', 'lottery', 'restaurant'].includes(activity.type)) continue;
+    if (done.has(key) || !['guess', 'choice', 'prompt', 'table', 'chart', 'lottery', 'restaurant', 'picture'].includes(activity.type)) continue;
     done.add(key);
     yield { activity, item: frame.collect ? null : frame.item, key, part };
   }
@@ -150,6 +153,15 @@ export function studySlidesHtml(session: Session, live: LiveData | null, code: s
     if (a.type === 'section') {
       slides.push(`<section class="slide title"><p class="kicker">Part ${a.number} of ${session.sections.length}</p>
         <h1>${esc(a.title)}</h1>${a.subtitle ? `<p class="muted">${esc(a.subtitle)}</p>` : ''}</section>`);
+    }
+
+    // A picture with a title is content; one without (an opening cartoon) is not.
+    if (a.type === 'picture' && a.title) {
+      const figures: { file: string; caption?: string }[] = a.images ?? [{ file: a.image }];
+      slide(kicker, `<h2>${esc(a.title)}</h2>
+        <div class="gallery">${figures.map((f) => `<figure>${img(session.images[f.file])}${f.caption ? `<figcaption>${rich(f.caption)}</figcaption>` : ''}</figure>`).join('')}</div>
+        ${a.text ? `<div class="answer"><p>${rich(a.text)}</p></div>` : ''}
+        ${a.credit ? `<p class="muted">${esc(a.credit)}</p>` : ''}`);
     }
 
     if (a.type === 'restaurant') {

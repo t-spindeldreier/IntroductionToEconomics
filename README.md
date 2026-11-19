@@ -284,7 +284,9 @@ label (under `partTitle`), `all` shows everything, so you can ask for a predicti
 between.
 
 **Picture.** `type: picture` with `image: file.jpg` shows one figure as large as the
-projector allows, for example as the opening slide before the lobby. Select the image
+projector allows, for example as the opening slide before the lobby. With `images` (a
+list of up to four `{ file, caption }`), `title`, `text` and `credit` it becomes a slide
+of captioned figures, which is also included in the study slides. Select the image
 file together with the session file, as for other figures.
 
 **Table.** `type: table` shows a comparison table on the projector (phones only show

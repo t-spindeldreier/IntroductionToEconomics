@@ -1,5 +1,5 @@
 import { S } from '../../strings';
-import { h } from '../../ui/dom';
+import { h, rich } from '../../ui/dom';
 import { nickname } from '../../core/nicknames';
 import { joinBlock, type StageViewFn } from '../../stage/env';
 import { modePill } from '../../ui/pill';
@@ -56,8 +56,22 @@ export const podiumStage: StageViewFn = (env) => {
     h('div', { class: 'podium' }, place(2), place(1), place(3)));
 };
 
-/** Picture: the figure as large as the screen allows. */
+/** Picture: one figure as large as the screen allows, or several with captions, a title and a text. */
 export const pictureStage: StageViewFn = (env) => {
+  const a = env.activity;
+  const ok = (src: unknown): src is string => typeof src === 'string' && src.startsWith('data:image/');
+  if (a.images || a.title || a.text) {
+    const figures: { file: string; caption?: string }[] = a.images ?? [{ file: a.image }];
+    return h('div', { class: 'view gallery-view' },
+      a.title ? h('h1', { class: 'headline' }, a.title) : null,
+      h('div', { class: 'gallery' }, figures.map((f) => {
+        const src = env.session.images[f.file];
+        return h('figure', null, ok(src) ? h('img', { src, alt: f.caption ?? '' }) : null,
+          f.caption ? h('figcaption', null, rich(f.caption)) : null);
+      })),
+      a.text ? h('div', { class: 'answer-card compact' }, h('p', { class: 'answer-text' }, rich(a.text))) : null,
+      a.credit ? h('p', { class: 'credit muted' }, a.credit) : null);
+  }
   const src = env.session.images[env.activity.image];
   return h('div', { class: 'view picture-view' },
     src && src.startsWith('data:image/') ? h('img', { src, alt: env.activity.label ?? '' }) : null);

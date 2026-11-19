@@ -57,19 +57,41 @@ export const podiumDef: ActivityDef = {
   }),
 };
 
-/** Picture: one figure filling the projector (an opening slide, a cartoon). Phones show nothing of it. */
+/**
+ * Picture: figures on the projector; phones show nothing of them.
+ *   image    one file name: the figure fills the screen (an opening slide, a cartoon)
+ *   images   or a list of { file, caption }: shown side by side, each with its caption
+ *   title    heading
+ *   text     one or two sentences under the figures
+ *   credit   where the figures come from (photographers, licences)
+ * A picture with a title is also part of the study slides.
+ */
 export const pictureDef: ActivityDef = {
   type: 'picture',
   validate(a, v) {
-    v.only(a, ['type', 'id', 'image', 'label']);
-    v.text(a, 'image', { required: true, max: 120 });
+    v.only(a, ['type', 'id', 'image', 'images', 'title', 'text', 'credit', 'label']);
+    v.text(a, 'image', { max: 120 });
+    v.text(a, 'title', { max: 120 });
+    v.text(a, 'text', { max: 500 });
+    v.text(a, 'credit', { max: 300 });
     v.text(a, 'label', { max: 60 });
+    if (a.images !== undefined) {
+      if (!Array.isArray(a.images) || a.images.length < 1 || a.images.length > 4) v.at('images').err('must be a list of 1 to 4 figures');
+      else a.images.forEach((im: any, i: number) => {
+        const iv = v.at(`images[${i + 1}]`);
+        if (typeof im !== 'object' || im === null) return iv.err('must have a "file"');
+        iv.only(im, ['file', 'caption']);
+        iv.text(im, 'file', { required: true, max: 120 });
+        iv.text(im, 'caption', { max: 200 });
+      });
+    }
+    if (!a.image === !a.images) v.err('needs either "image" or "images"');
   },
   itemCount: () => 0,
   phases: () => ['show'],
   defaultPhases: () => ['show'],
   phaseLabel: () => S.phase.show,
-  stepLabel: (a) => `${S.step.picture}: ${a.label ?? a.image}`,
+  stepLabel: (a) => `${S.step.picture}: ${a.label ?? a.title ?? a.image}`,
   enter: () => ({ view: { type: 'picture' } }),
 };
 
