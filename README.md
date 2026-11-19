@@ -283,6 +283,14 @@ optional `prefix`/`suffix` ("$", "%"), `marker: { after: label, text }` for a da
 label (under `partTitle`), `all` shows everything, so you can ask for a prediction in
 between.
 
+**Logo.** A top-level line `logo: file.jpg` in the session file puts a small logo in the
+top right corner of every slide and of the study slides. Select the file together with
+the session file.
+
+**Intro.** `type: intro` is a slide about the course and the tutor: `kicker`, `title`,
+`subtitle`, `bullets` (a short list), and `person: { name, role, bullets, contact }`,
+which is shown on a card.
+
 **Picture.** `type: picture` with `image: file.jpg` shows one figure as large as the
 projector allows, for example as the opening slide before the lobby. With `images` (a
 list of up to four `{ file, caption }`), `title`, `text` and `credit` it becomes a slide

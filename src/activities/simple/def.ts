@@ -95,6 +95,41 @@ export const pictureDef: ActivityDef = {
   enter: () => ({ view: { type: 'picture' } }),
 };
 
+/**
+ * Intro: what this course is and who is standing in front, before anything starts.
+ *   kicker, title, subtitle   the course
+ *   bullets                   a few short points about the sessions
+ *   person                    { name, role, bullets, contact }: shown on a card
+ */
+export const introDef: ActivityDef = {
+  type: 'intro',
+  validate(a, v) {
+    v.only(a, ['type', 'id', 'kicker', 'title', 'subtitle', 'bullets', 'person']);
+    v.text(a, 'kicker', { max: 80 });
+    v.text(a, 'title', { required: true, max: 80 });
+    v.text(a, 'subtitle', { max: 120 });
+    const list = (x: unknown) => Array.isArray(x) && x.length <= 6 && x.every((t) => typeof t === 'string' && t.length <= 140);
+    if (a.bullets !== undefined && !list(a.bullets)) v.at('bullets').err('must be a list of up to 6 short texts');
+    if (a.person !== undefined) {
+      const pv = v.at('person');
+      if (typeof a.person !== 'object' || a.person === null) pv.err('must have a name');
+      else {
+        pv.only(a.person, ['name', 'role', 'bullets', 'contact']);
+        pv.text(a.person, 'name', { required: true, max: 60 });
+        pv.text(a.person, 'role', { max: 80 });
+        pv.text(a.person, 'contact', { max: 80 });
+        if (a.person.bullets !== undefined && !list(a.person.bullets)) pv.at('bullets').err('must be a list of up to 6 short texts');
+      }
+    }
+  },
+  itemCount: () => 0,
+  phases: () => ['show'],
+  defaultPhases: () => ['show'],
+  phaseLabel: () => S.phase.show,
+  stepLabel: (a) => `${S.step.intro}: ${a.title}`,
+  enter: () => ({ view: { type: 'picture' } }), // phones: just "look at the screen"
+};
+
 /** End: thank-you screen; phones show the final rank. */
 export const endDef: ActivityDef = {
   type: 'end',

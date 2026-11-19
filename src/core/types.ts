@@ -87,6 +87,8 @@ export interface Session {
   sections: { title: string; subtitle: string | null; firstFrame: number }[];
   /** Figures by file name, as data URLs. Stored once, however often they are shown. */
   images: Record<string, string>;
+  /** File name of a small logo shown in a corner of every slide (a key of images), or null. */
+  logo: string | null;
   /** Open exam questions with model answers. Tutor only: never shown to students. */
   exam: { question: string; answer: string; about: string | null; points: number | null }[];
 }

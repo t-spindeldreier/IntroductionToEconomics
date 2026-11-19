@@ -8,7 +8,7 @@ import type { ActivityDef, PhoneView } from '../core/types';
 import { guessDef } from './guess/def';
 import { choiceDef } from './choice/def';
 import { promptDef } from './prompt/def';
-import { lobbyDef, podiumDef, endDef, pictureDef, sectionDef } from './simple/def';
+import { lobbyDef, podiumDef, endDef, introDef, pictureDef, sectionDef } from './simple/def';
 import { tableDef } from './table/def';
 import { chartDef } from './chart/def';
 import { lotteryDef } from './lottery/def';
@@ -21,6 +21,7 @@ export const defs: Record<string, ActivityDef> = {
   prompt: promptDef,
   table: tableDef,
   picture: pictureDef,
+  intro: introDef,
   chart: chartDef,
   lottery: lotteryDef,
   restaurant: restaurantDef,

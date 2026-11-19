@@ -18,7 +18,8 @@ export function compileSession(raw: unknown): CompileResult {
     return fail();
   }
   const file = structuredClone(raw) as Record<string, any>;
-  v.only(file, ['title', 'activities', 'steps', 'exam', 'images']);
+  v.only(file, ['title', 'activities', 'steps', 'exam', 'images', 'logo']);
+  v.text(file, 'logo', { max: 120 });
   // "images" is filled in by the stage page when figures are selected with the file.
   const images: Record<string, string> = typeof file.images === 'object' && file.images !== null ? file.images : {};
 
@@ -143,7 +144,7 @@ export function compileSession(raw: unknown): CompileResult {
 
   if (frames.length > 400) v.err('The session has more than 400 key presses. Split it.');
   if (v.errors.length > 0) return fail();
-  return { ok: true, session: { title: file.title, activities, frames, steps, sections, exam, images } };
+  return { ok: true, session: { title: file.title, activities, frames, steps, sections, exam, images, logo: typeof file.logo === 'string' ? file.logo : null } };
 }
 
 /** The hint in the corner of the stage: what the next press of the right arrow does. */

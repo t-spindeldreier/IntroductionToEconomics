@@ -53,7 +53,10 @@ try {
   await stage.keyboard.press('h');
   await stage.fill('.count-input', String(students));
   await stage.getByRole('button', { name: 'Add simulated students' }).click();
-  await stage.getByText(`${students} simulated students`).waitFor();
+  await stage.getByText(`${students} simulated students`).waitFor({ timeout: 60000 }).catch(async (e) => {
+    console.error('PANEL SAYS:', (await stage.textContent('body')).replace(/\s+/g, ' ').slice(-700));
+    throw e;
+  });
   await stage.keyboard.press('Escape');
 
   let n = 0;

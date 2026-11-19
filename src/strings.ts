@@ -206,6 +206,7 @@ export const S = {
     prompt: 'Prompt',
     table: 'Table',
     picture: 'Picture',
+    intro: 'Intro',
     chart: 'Chart',
     lottery: 'Birthday lottery',
     restaurant: 'Restaurant game',

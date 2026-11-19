@@ -77,5 +77,24 @@ export const pictureStage: StageViewFn = (env) => {
     src && src.startsWith('data:image/') ? h('img', { src, alt: env.activity.label ?? '' }) : null);
 };
 
+/** Intro: the course on the left, the tutor on a card on the right. */
+export const introStage: StageViewFn = (env) => {
+  const a = env.activity;
+  const p = a.person;
+  const initials = p ? String(p.name).split(/\s+/).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() : '';
+  return h('div', { class: 'view intro-view' },
+    h('div', { class: 'intro-main' },
+      a.kicker ? h('p', { class: 'section-part' }, a.kicker) : null,
+      h('h1', { class: 'section-title' }, a.title),
+      a.subtitle ? h('p', { class: 'section-subtitle' }, a.subtitle) : null,
+      a.bullets ? h('ul', { class: 'intro-bullets' }, (a.bullets as string[]).map((b) => h('li', null, rich(b)))) : null),
+    p ? h('div', { class: 'intro-side' }, h('div', { class: 'person-card' },
+      h('div', { class: 'avatar', 'aria-hidden': 'true' }, initials),
+      h('p', { class: 'person-name' }, p.name),
+      p.role ? h('p', { class: 'person-role' }, p.role) : null,
+      p.bullets ? h('ul', { class: 'person-bullets' }, (p.bullets as string[]).map((b) => h('li', null, rich(b)))) : null,
+      p.contact ? h('p', { class: 'person-contact' }, p.contact) : null)) : null);
+};
+
 export const endStage: StageViewFn = (env) =>
   h('div', { class: 'view centered end-view' }, h('h1', { class: 'section-title' }, env.activity.text ?? S.thanks));

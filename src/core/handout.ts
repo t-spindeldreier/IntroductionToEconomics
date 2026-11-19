@@ -36,6 +36,8 @@ const STYLE = `
   .slide { width: min(100vw, 13.333in); aspect-ratio: 16 / 9; margin: 1.2rem auto; padding: 4.5% 6%; background: #fcfcfb;
     display: flex; flex-direction: column; gap: 0.8em; font-size: clamp(11px, 1.6vw, 23px); line-height: 1.35;
     box-shadow: 0 2px 12px rgba(0,0,0,.12); overflow: hidden; page-break-after: always; break-after: page; }
+  .slide { position: relative; }
+  .slide .logo { position: absolute; top: 2.2%; right: 2%; height: 7.5%; padding: .3% .5%; background: #fff; border-radius: .3em; }
   .slide.title { justify-content: center; background: #14304f; color: #fff; }
   .slide.title .muted, .slide.title .kicker { color: #c9d6e6; }
   h1 { font-size: 2.6em; line-height: 1.1; margin: 0; }
@@ -141,8 +143,10 @@ export function sharesByArm(choice: Activity, key: string, guess: Activity, live
 
 export function studySlidesHtml(session: Session, live: LiveData | null, code: string | null): string {
   const slides: string[] = [];
+  const logoSrc = session.logo ? session.images[session.logo] : null;
+  const logo = typeof logoSrc === 'string' && logoSrc.startsWith('data:image/') ? `<img class="logo" src="${esc(logoSrc)}" alt="">` : '';
   const slide = (kicker: string, body: string) =>
-    slides.push(`<section class="slide"><p class="kicker">${esc(kicker)}</p>${body}</section>`);
+    slides.push(`<section class="slide">${logo}<p class="kicker">${esc(kicker)}</p>${body}</section>`);
 
   slides.push(`<section class="slide title"><p class="kicker">Study slides</p><h1>${esc(session.title)}</h1>
     <p class="muted">Every question from the session with its answer${live ? ' and how the class answered' : ''}.</p></section>`);

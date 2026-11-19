@@ -9,6 +9,7 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import demoYaml from '../../sessions/demo.yaml?raw';
 import { S } from '../strings';
+import type { Session } from '../core/types';
 import { h, replaceContent } from '../ui/dom';
 import { app, db, USE_EMULATOR } from '../data/firebase';
 import { compileSession, nextLabel } from '../core/session';
@@ -161,12 +162,18 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
+/** The session's logo for a corner of the slide, on a white tile so it also works on dark slides. */
+function logoOf(session: Session): HTMLElement | null {
+  const src = session.logo ? session.images[session.logo] : null;
+  return src && src.startsWith('data:image/') ? h('img', { class: 'corner-logo', src, alt: '' }) : null;
+}
+
 /** Put the figures the session refers to into the session itself, so it is one document. */
 function embedImages(raw: any, images: Map<string, string>): string[] {
   const errors: string[] = [];
   if (typeof raw !== 'object' || raw === null) return errors;
   raw.images = {};
-  for (const a of Object.values<any>(raw.activities ?? {})) {
+  for (const a of [{ image: raw.logo }, ...Object.values<any>(raw.activities ?? {})]) {
     const names = [a?.image, a?.revealImage, ...(Array.isArray(a?.images) ? a.images.map((im: any) => im?.file) : [])];
     for (const name of names) {
       if (typeof name !== 'string') continue;
@@ -247,6 +254,7 @@ async function openRoom(code: string): Promise<void> {
     const section = frame.section >= 0 ? ctl.session.sections[frame.section] : null;
     replaceContent(stageEl,
       stageViews[frame.type](env),
+      logoOf(ctl.session),
       // Where we are in the session, like the footer of a slide deck.
       section && frame.type !== 'section' ? h('div', { class: 'crumb' },
         h('span', { class: 'crumb-part' }, S.part(frame.section + 1, ctl.session.sections.length)),
