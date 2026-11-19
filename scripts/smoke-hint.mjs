@@ -1,4 +1,4 @@
-// Browser check of the birthday lottery, the hint game (before-and-after guess) and
+// Browser check of the restaurant game, the birthday lottery, the hint game (before-and-after guess) and
 // the bar game (regression discontinuity): two real phones, one in each group. Only the phone in the hinted group may show the hint, and the stage
 // must compute the difference in differences from the two rounds.
 //
@@ -23,6 +23,7 @@ writeFileSync(file, JSON.stringify({
   title: 'Hint game check',
   activities: {
     draft: { type: 'lottery', text: 'Which number did your birthday draw?' },
+    burger: { type: 'restaurant', intro: 'You manage a restaurant.', news: 'NEWSLINE minimum wage up', question: 'How many employees?' },
     side: { type: 'choice', question: 'Where?', options: ['Front half', 'Back half'], items: [{ text: 'Where are you sitting?' }] },
     g1: { type: 'guess', stageText: 'How many?', part2: 'About ___ thousand.' },
     g2: { type: 'guess', stageText: 'Again: how many?', part2: 'About ___ thousand.', splitBy: 'side', before: 'g1',
@@ -31,7 +32,7 @@ writeFileSync(file, JSON.stringify({
     b2: { type: 'guess', stageText: 'Again: how many millions?', part2: 'About ___ million.', before: 'b1', bar: 'median',
       hint: 'BARMESSAGE upper half', takeaway: 'Jump.' },
   },
-  steps: ['lobby', 'draft', { activity: 'side', phases: ['open', 'closed'] }, { activity: 'g1', phases: ['open', 'closed'] }, 'g2',
+  steps: ['lobby', 'burger', 'draft', { activity: 'side', phases: ['open', 'closed'] }, { activity: 'g1', phases: ['open', 'closed'] }, 'g2',
     { activity: 'b1', phases: ['open', 'closed'] }, 'b2'],
 }));
 
@@ -82,6 +83,38 @@ try {
     await page.locator('button[type=submit]').tap();
     await page.getByText('Received').waitFor();
   };
+
+  // ----- the restaurant game: each phone manages a real restaurant -----
+  await next(); // burger: assign
+  for (const page of phones) await page.waitForSelector('.store-card');
+  check(!(await front.textContent('body')).includes('NEWSLINE'), 'no news before the news phase');
+  await front.screenshot({ path: `${OUT}/restaurant-phone-assign.png` });
+  await next(); // burger: news
+  for (const page of phones) {
+    await page.getByText('NEWSLINE').waitFor();
+    const inNJ = (await page.locator('.store-card.state-0').count()) === 1;
+    const text = await page.textContent('.news-box');
+    check(inNJ ? /must pay|already pay/.test(text) : text.includes('Nothing changes for you'), `a manager in ${inNJ ? 'New Jersey' : 'Pennsylvania'} gets the right news`);
+  }
+  await front.screenshot({ path: `${OUT}/restaurant-phone-news.png` });
+  await next(); // burger: open
+  for (const [page, n] of [[front, '17'], [back, '20']]) {
+    await page.waitForSelector('.guess-input');
+    await page.fill('.guess-input', n);
+    await page.locator('button[type=submit]').tap();
+    await page.getByText('Received').waitFor();
+  }
+  await next(); // burger: closed
+  await next(); // burger: class
+  await stage.waitForSelector('.change-table');
+  await next(); // burger: real
+  await stage.getByText('What really happened').waitFor();
+  check((await stage.textContent('.answer-main')).includes('+0.6 − (−2.1) = +2.7'), 'the stage shows the real difference in differences');
+  await front.getByText('What your restaurant really did').waitFor();
+  await front.screenshot({ path: `${OUT}/restaurant-phone-real.png` });
+  await next(); // burger: best
+  await stage.getByText('Managers of the year').waitFor();
+  check((await stage.locator('.top-list li').count()) === 2, 'both managers are ranked by how close their plan was');
 
   // ----- the birthday lottery: 14 September drew number 1, 1 January number 305 -----
   await next(); // draft: open

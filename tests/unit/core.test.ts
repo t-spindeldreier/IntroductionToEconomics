@@ -132,9 +132,8 @@ describe('session files', () => {
     expect(session.frames[0].type).toBe('picture');
     expect(session.frames.at(-1)!.section).toBe(3);
     expect(session.exam.length).toBeGreaterThanOrEqual(8);
-    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 2, 0, 1]);
-    // the earnings chart first shows only the years before the lottery
-    expect(session.frames.filter((f) => f.id === 'gap').map((f) => f.phase)).toEqual(['part', 'all']);
+    expect(session.activities.quiz.items.map((i: any) => i.correct)).toEqual([1, 1, 0, 2]);
+    expect(session.frames.filter((f) => f.id === 'burger').map((f) => f.phase)).toEqual(['assign', 'news', 'open', 'closed', 'class', 'real', 'best']);
     // the hint before the first reveal must not say "versions"
     const firstReveal = session.frames.findIndex((f) => f.phase === 'versions');
     expect(nextLabel(session, firstReveal - 1)).toBe('reveal (1 of 3)');
@@ -259,6 +258,30 @@ describe('before and after, and the table', () => {
       g1: { type: 'guess', stageText: 's', part2: 'p' },
       g2: { type: 'guess', stageText: 's', part2: 'p', before: 'g1' } }, steps: ['g1', 'g2'] });
     expect(bad.ok ? '' : bad.errors.join()).toContain('before: needs "splitBy"');
+  });
+});
+
+describe('the restaurant game', () => {
+  it('gives every phone a real restaurant and compares the class with the study', async () => {
+    const { storeOf, summariseRestaurant, realRows, didOf } = await import('../../src/activities/restaurant/def');
+    const { STORES } = await import('../../src/activities/restaurant/stores');
+    expect(STORES.map((s) => s.length)).toEqual([60, 60]);
+    // Table 3 of Card and Krueger (1994)
+    expect(didOf(realRows())).toBe(2.7); // 2.76 unrounded
+    const pids = Array.from({ length: 200 }, (_, i) => pidOf('s' + i));
+    const states = pids.map((p) => storeOf(p, 'burger').state);
+    expect(states.filter((s) => s === 0).length).toBeGreaterThan(70);
+    expect(states.filter((s) => s === 1).length).toBeGreaterThan(70);
+    // everyone keeps their staff, except New Jersey managers who cut two jobs
+    const responses = pids.map((pid, i) => {
+      const { state, store } = storeOf(pid, 'burger');
+      return { key: 'burger', pid, v: store[2] - (state === 0 ? 2 : 0), at: i, fake: false };
+    });
+    const s = summariseRestaurant({ type: 'restaurant', id: 'burger' }, { responses: () => responses });
+    expect(s.rows[0].change).toBeCloseTo(-2);
+    expect(s.rows[1].change).toBeCloseTo(0);
+    expect(s.did).toBeCloseTo(-2);
+    expect(s.closest[0].off).toBeLessThanOrEqual(s.closest[1].off);
   });
 });
 

@@ -4,6 +4,7 @@
 
 import type { Activity, Frame, OpenWindow } from '../core/types';
 import { armOf } from '../core/identity';
+import { storeOf } from '../activities/restaurant/def';
 
 export interface FakeAnswer {
   delayMs: number;
@@ -61,6 +62,12 @@ export function fakeAnswer(a: Activity, frame: Frame, open: OpenWindow, pid: str
     v = v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
     if (a.exclusiveMin && v <= a.min) v = a.min + 1;
     return { delayMs, v, ...(a.part1 ? { p1: v > anchor ? 0 : 1 } : {}) };
+  }
+
+  // restaurant game: simulated managers in New Jersey cut about a tenth of their staff
+  if (a.type === 'restaurant') {
+    const { state, store } = storeOf(pid, a.id);
+    return { delayMs, v: Math.max(1, Math.round(store[2] * (state === 0 ? 0.9 : 1) * Math.exp(0.06 * normal(rand)))) };
   }
 
   // birthday lottery: 195 of 366 birthdays were called up

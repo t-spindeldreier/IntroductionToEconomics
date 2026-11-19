@@ -255,6 +255,18 @@ line, medians of all students below and above) and `band` (the students closest 
 bar on each side, about a third of each side, the jump between their medians, and the
 `takeaway`). The study slides and the exam bank contain the same plot and numbers.
 
+**Restaurant game.** `type: restaurant` is the minimum-wage game after Card and Krueger
+(1994). Every phone manages one real fast-food restaurant from the study, in New Jersey
+(minimum wage raised in April 1992) or in Pennsylvania (no change); which one follows
+from the phone's anonymous id, like the versions of a guess. Fields: `intro`, `news` (the
+headline), `question`, `classTakeaway`, `takeaway`. Phases: `assign` (a map with one dot
+per manager), `news`, `open` and `closed` (managers decide how many employees to have in
+November), `class` (the room's plans per state and their difference in differences),
+`real` (the same table for the 410 real restaurants, Table 3 of the paper) and `best`
+(the five managers whose plan was closest to what their real restaurant did). The
+restaurant data comes from the public data set on David Card's website; the dots on the
+map are placed at random within the restaurant's region, because the data has no addresses.
+
 **Birthday lottery.** `type: lottery` with a `text` (and optionally `cutoff`, default
 195, and `takeaway`): every student picks day and month of their birthday, and the
 phone shows the number that birthday drew in the US draft lottery of 1 December 1969

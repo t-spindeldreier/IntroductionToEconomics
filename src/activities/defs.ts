@@ -12,6 +12,7 @@ import { lobbyDef, podiumDef, endDef, pictureDef, sectionDef } from './simple/de
 import { tableDef } from './table/def';
 import { chartDef } from './chart/def';
 import { lotteryDef } from './lottery/def';
+import { restaurantDef } from './restaurant/def';
 
 export const defs: Record<string, ActivityDef> = {
   lobby: lobbyDef,
@@ -22,6 +23,7 @@ export const defs: Record<string, ActivityDef> = {
   picture: pictureDef,
   chart: chartDef,
   lottery: lotteryDef,
+  restaurant: restaurantDef,
   podium: podiumDef,
   section: sectionDef,
   end: endDef,

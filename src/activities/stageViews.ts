@@ -7,6 +7,7 @@ import { promptStage } from './prompt/stage';
 import { tableStage } from './table/stage';
 import { chartStage } from './chart/stage';
 import { lotteryStage } from './lottery/stage';
+import { restaurantStage } from './restaurant/stage';
 import { endStage, lobbyStage, pictureStage, podiumStage, sectionStage } from './simple/stage';
 
 export const stageViews: Record<string, StageViewFn> = {
@@ -18,6 +19,7 @@ export const stageViews: Record<string, StageViewFn> = {
   picture: pictureStage,
   chart: chartStage,
   lottery: lotteryStage,
+  restaurant: restaurantStage,
   podium: podiumStage,
   section: sectionStage,
   end: endStage,

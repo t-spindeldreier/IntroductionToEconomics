@@ -14,6 +14,7 @@ import { countOptions, formatNumber } from './stats';
 import { armOf } from './identity';
 import { scatterSvg, summariseBar } from './scatter';
 import { barChartSvg } from './chart';
+import { didOf, realRows, summariseRestaurant, type StateRow } from '../activities/restaurant/def';
 import { summariseChange, summariseGuess, part1Text, signed } from '../activities/guess/def';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -90,7 +91,7 @@ function* questions(session: Session): Generator<{ activity: Activity; item: num
     }
     const activity = session.activities[frame.collect ?? frame.id];
     const key = frame.collect ?? frame.key;
-    if (done.has(key) || !['guess', 'choice', 'prompt', 'table', 'chart', 'lottery'].includes(activity.type)) continue;
+    if (done.has(key) || !['guess', 'choice', 'prompt', 'table', 'chart', 'lottery', 'restaurant'].includes(activity.type)) continue;
     done.add(key);
     yield { activity, item: frame.collect ? null : frame.item, key, part };
   }
@@ -104,6 +105,15 @@ function changeTable(a: Activity, live: Pick<LiveData, 'responses'>): string {
     ${rows.map((r) => `<tr><th>${esc(r.title)} (${r.hinted ? 'got the hint' : 'no hint'}, ${r.n} students)</th>
       <td>${num(r.before)}</td><td>${num(r.after)}</td><td>${signed(r.change, formatNumber)}</td></tr>`).join('')}
     <tr><th>Difference in differences</th><td></td><td></td><td>${signed(did, formatNumber)}</td></tr></tbody></table>`;
+}
+
+/** February, November and change per state (the restaurant game), with the difference in differences. */
+function stateTable(rows: StateRow[], afterLabel: string): string {
+  const one = (x: number | null) => (x === null ? '–' : x.toFixed(1));
+  const sign = (x: number | null) => (x === null ? '–' : `${x > 0.049 ? '+' : x < -0.049 ? '−' : ''}${Math.abs(x).toFixed(1)}`);
+  return `<table class="grid"><thead><tr><th></th><th>February 1992</th><th>${afterLabel}</th><th>Change</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><th>${esc(r.name)} (${r.n} restaurants)</th><td>${one(r.before)}</td><td>${one(r.after)}</td><td>${sign(r.change)}</td></tr>`).join('')}
+    <tr><th>New Jersey compared with Pennsylvania</th><td></td><td></td><td>${sign(didOf(rows))}</td></tr></tbody></table>`;
 }
 
 /** The bar game in numbers (for a guess with "bar"). */
@@ -140,6 +150,18 @@ export function studySlidesHtml(session: Session, live: LiveData | null, code: s
     if (a.type === 'section') {
       slides.push(`<section class="slide title"><p class="kicker">Part ${a.number} of ${session.sections.length}</p>
         <h1>${esc(a.title)}</h1>${a.subtitle ? `<p class="muted">${esc(a.subtitle)}</p>` : ''}</section>`);
+    }
+
+    if (a.type === 'restaurant') {
+      slide(kicker, `<h2>${rich(a.news)}</h2>
+        <p>Every student managed one real fast-food restaurant, in New Jersey (minimum wage raised from $4.25 to $5.05) or in Pennsylvania (no change), and decided how many employees to have in November.</p>
+        ${live ? `<p class="label">What the class decided (average employees per restaurant)</p>${stateTable(summariseRestaurant(a, live).rows, 'November (plans)')}` : ''}
+        ${a.classTakeaway ? `<p class="muted">${rich(a.classTakeaway)}</p>` : ''}`);
+      slide(kicker, `<h2>What really happened</h2>
+        <p class="label">All 410 restaurants of the study (average employees per restaurant, full-time equivalents)</p>
+        ${stateTable(realRows(), 'November 1992')}
+        ${a.takeaway ? `<div class="answer"><p class="label">What it shows</p><p>${rich(a.takeaway)}</p></div>` : ''}
+        <p class="muted">Source: Card and Krueger (1994), American Economic Review, Table 3.</p>`);
     }
 
     if (a.type === 'chart') {
@@ -254,6 +276,11 @@ export function examBankHtml(session: Session, live: LiveData, code: string): st
         ${a.truth ? `<p class="muted">True value: ${esc(a.truth.label)}</p>` : ''}
         ${a.bar !== undefined ? `<p class="muted">Message above the bar only: “${rich(a.hint)}”. Students who answered both rounds:</p>${barTable(a, live)}${scatterSvg(summariseBar(a, live), a.axis, true)}` : ''}
         ${a.before && a.splitBy ? `<p class="muted">Hint for “${esc(a.splitOptions[a.hintOption])}” only: “${rich(a.hint)}”. Medians of students who answered both rounds:</p>${changeTable(a, live)}` : ''}`);
+    }
+    if (a.type === 'restaurant') {
+      parts.push(`<p class="q">Restaurant game: ${rich(a.news)}</p>
+        <p class="muted">What the class decided (average employees per restaurant):</p>${stateTable(summariseRestaurant(a, live).rows, 'November (plans)')}
+        <p class="muted">What really happened (Card and Krueger 1994, Table 3):</p>${stateTable(realRows(), 'November 1992')}`);
     }
     if (a.type === 'choice') {
       const i = item ?? 0;
