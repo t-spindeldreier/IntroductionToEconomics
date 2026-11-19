@@ -3,15 +3,18 @@
 
 import { S } from '../../strings';
 import { h } from '../../ui/dom';
-import { answerStatus, type PhoneViewFn } from '../../phone/env';
-import { NEW_MINIMUM, OLD_MINIMUM, STATES, storeOf } from './def';
+import { answerStatus, waiting, type PhoneViewFn } from '../../phone/env';
+import { NEW_MINIMUM, OLD_MINIMUM, STATES, storeAt } from './def';
 import { CHAINS, REGIONS } from './stores';
 
 const dollars = (x: number) => `$${x.toFixed(2)}`;
 
 export const restaurantPhone: PhoneViewFn = (view, env) => {
   const key = view.key!;
-  const { state, store } = storeOf(env.me.pid, key);
+  // The stage deals out the restaurants. A phone that joined a moment ago is on the next list.
+  const code = (view.stores as Record<string, number> | undefined)?.[env.me.pid];
+  if (code === undefined) return waiting(h('p', { class: 'muted' }, S.restaurantSoon));
+  const { state, store } = storeAt(code);
   const [chain, region, before, after, wage] = store;
   const answer = env.client.answers[key];
   const inNJ = state === 0;
@@ -32,7 +35,8 @@ export const restaurantPhone: PhoneViewFn = (view, env) => {
     h('p', { class: 'answer-label' }, S.newsFlash),
     h('p', { class: 'news-headline' }, String(view.news ?? '')),
     h('p', null, !inNJ ? S.newsPA(dollars(OLD_MINIMUM))
-      : raise > 0 ? S.newsNJ(dollars(wage), dollars(NEW_MINIMUM), raise) : S.newsNJAbove(dollars(wage))));
+      : raise > 0 ? S.newsNJ(dollars(wage), dollars(NEW_MINIMUM), raise) : S.newsNJAbove(dollars(wage))),
+    inNJ && raise > 0 ? h('p', { class: 'news-think' }, S.newsThink) : null);
 
   if (view.phase === 'news') return h('div', { class: 'card' }, badge, news);
 

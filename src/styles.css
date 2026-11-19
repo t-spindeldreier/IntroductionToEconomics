@@ -134,6 +134,7 @@ strong { font-weight: 700; }
 .news-box { padding: 0.8rem 0.9rem; border-radius: 12px; background: var(--paper); border-left: 6px solid var(--line); text-align: left; }
 .news-box.hit { border-left-color: #b3261e; }
 .news-box p { margin: 0; }
+.news-think { margin-top: 0.4rem !important; font-weight: 700; }
 .news-headline { font-size: 1.25rem; font-weight: 800; line-height: 1.2; margin: 0.2rem 0 0.4rem !important; }
 .hint-box { border-left: 6px solid var(--brand); font-weight: 700; }
 .quote { font-size: 1.1rem; padding: 0.75rem; background: var(--paper); border-radius: 12px; text-align: left; }

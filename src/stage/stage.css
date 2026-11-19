@@ -189,7 +189,8 @@
 .map-panel { flex: none; width: 40vw; height: 100%; display: flex; flex-direction: column; gap: 0.8vw; }
 .map-box { flex: 1; min-height: 0; border-radius: 1.2vw; overflow: hidden; box-shadow: var(--shadow); }
 .map-box .map { width: 100%; height: 100%; display: block; }
-.map-legend { display: flex; gap: 2vw; font-size: 1.35vw; white-space: nowrap; }
+.map-legend { display: flex; gap: 1.6vw; font-size: 1.25vw; white-space: nowrap; align-items: baseline; }
+.map-legend .muted { margin-left: auto; font-size: 1.1vw; }
 .map-side { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2vw; }
 .news-card { padding: 2vw 2.4vw; background: #fff; border-top: 0.9vw solid #b3261e; border-radius: 0 0 1.2vw 1.2vw; box-shadow: var(--shadow); }
 .news-date { font-size: 1.5vw; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #b3261e; }

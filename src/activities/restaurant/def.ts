@@ -5,18 +5,23 @@
 // decisions are then set against what the 410 real restaurants did.
 //
 // Session file fields:
-//   intro         line on the projector when the restaurants are handed out
-//   news          the headline of the news flash
-//   question      shown while managers decide
-//   classTakeaway one or two sentences under the class's decisions
-//   takeaway      one or two sentences under the real numbers
+//   intro               line on the projector when the restaurants are handed out
+//   news                the headline of the news flash
+//   question            shown while managers decide
+//   classTakeaway       under the class's decisions, if New Jersey managers cut jobs
+//   classTakeawayNoCut  the same, if they did not (default: classTakeaway)
+//   takeaway            one or two sentences under the real numbers
 //
 // Phases: assign, news, open, closed, class, real, best.
-// A phone's state and restaurant follow from its pid, like the arms of a guess.
+//
+// Who gets which restaurant: students are taken in the order in which they joined
+// and dealt alternately to New Jersey and Pennsylvania, each time the next restaurant
+// on the state's list. So the two groups are equally large, nobody chooses a state,
+// and no two students share a restaurant (up to 100 + 70 students). The stage sends
+// the list to the phones with every screen of the game.
 
 import { S } from '../../strings';
-import type { Activity, ActivityDef, LiveData } from '../../core/types';
-import { armOf } from '../../core/identity';
+import type { Activity, ActivityDef, LiveData, Participant } from '../../core/types';
 import { STORES, type Store } from './stores';
 
 export const STATES = ['New Jersey', 'Pennsylvania'];
@@ -28,10 +33,22 @@ export const REAL = [
   { name: STATES[1], n: 79, before: 23.33, after: 21.17 },
 ];
 
-/** The restaurant a phone manages: state 0 = New Jersey, 1 = Pennsylvania. */
-export function storeOf(pid: string, activityId: string): { state: number; store: Store } {
-  const state = armOf(pid, activityId, 2);
-  return { state, store: STORES[state][armOf(pid, `${activityId}:store`, STORES[state].length)] };
+/** pid -> state * 1000 + position in the state's list. */
+export type Assignment = Record<string, number>;
+
+export function assignStores(participants: Map<string, Participant>): Assignment {
+  const order = [...participants.entries()].sort(([p, a], [q, b]) => a.joinedAt - b.joinedAt || (p < q ? -1 : 1));
+  const out: Assignment = {};
+  order.forEach(([pid], i) => {
+    const state = i % 2;
+    out[pid] = state * 1000 + (Math.floor(i / 2) % STORES[state].length);
+  });
+  return out;
+}
+
+export function storeAt(code: number): { state: number; store: Store } {
+  const state = Math.floor(code / 1000);
+  return { state, store: STORES[state][code % 1000] };
 }
 
 export interface StateRow {
@@ -54,19 +71,26 @@ export const didOf = (rows: StateRow[]) =>
   (rows[0].change === null || rows[1].change === null ? null : r1(rows[0].change - rows[1].change));
 
 /** What the managers in the room decided, per state, and who came closest to the real restaurant. */
-export function summariseRestaurant(a: Activity, live: Pick<LiveData, 'responses'>) {
+export function summariseRestaurant(a: Activity, live: Pick<LiveData, 'responses' | 'participants'>) {
+  const assignment = assignStores(live.participants);
   const by: { before: number[]; after: number[] }[] = [{ before: [], after: [] }, { before: [], after: [] }];
   const closest: { pid: string; said: number; real: number; off: number; at: number }[] = [];
   for (const r of live.responses(a.id)) {
-    const { state, store } = storeOf(r.pid, a.id);
+    if (assignment[r.pid] === undefined) continue;
+    const { state, store } = storeAt(assignment[r.pid]);
     by[state].before.push(store[2]);
     by[state].after.push(r.v);
     closest.push({ pid: r.pid, said: r.v, real: store[3], off: Math.abs(r.v - store[3]), at: r.at });
   }
   const rows = by.map((g, i) => row(STATES[i], g.before.length, mean(g.before), mean(g.after)));
   closest.sort((x, y) => x.off - y.off || x.at - y.at);
-  return { rows, did: didOf(rows), closest };
+  const did = didOf(rows);
+  return { rows, did, closest, cut: did !== null && did <= -0.3 };
 }
+
+/** The text under the class's decisions: it depends on whether New Jersey managers cut jobs. */
+export const classTakeawayOf = (a: Activity, cut: boolean): string | undefined =>
+  (cut ? a.classTakeaway : a.classTakeawayNoCut ?? a.classTakeaway);
 
 /** The paper's unrounded estimate is 2.76; with one decimal throughout it reads 2.7. */
 export const realRows = (): StateRow[] => REAL.map((r) => row(r.name, r.n, r.before, r.after));
@@ -75,11 +99,12 @@ export const restaurantDef: ActivityDef = {
   type: 'restaurant',
 
   validate(a, v) {
-    v.only(a, ['type', 'id', 'intro', 'news', 'question', 'classTakeaway', 'takeaway']);
+    v.only(a, ['type', 'id', 'intro', 'news', 'question', 'classTakeaway', 'classTakeawayNoCut', 'takeaway']);
     v.text(a, 'intro', { required: true, max: 200 });
     v.text(a, 'news', { required: true, max: 200 });
     v.text(a, 'question', { required: true, max: 200 });
     v.text(a, 'classTakeaway', { max: 500 });
+    v.text(a, 'classTakeawayNoCut', { max: 500 });
     v.text(a, 'takeaway', { max: 500 });
   },
 
@@ -92,8 +117,10 @@ export const restaurantDef: ActivityDef = {
     class: S.phase.revealStep(1, 3), real: S.phase.revealStep(2, 3), best: S.phase.revealStep(3, 3) }[phase] ?? phase),
   stepLabel: () => S.step.restaurant,
 
-  enter({ activity: a, frame }) {
-    const view = { type: 'restaurant', key: a.id, phase: frame.phase, news: frame.phase === 'assign' ? null : a.news };
+  enter({ activity: a, frame, live }) {
+    const stores = assignStores(live.participants);
+    a.assignment = stores; // for the simulated students of rehearsal mode
+    const view = { type: 'restaurant', key: a.id, phase: frame.phase, news: frame.phase === 'assign' ? null : a.news, stores };
     if (frame.phase !== 'open') return { view };
     return { view, open: { key: a.id, type: 'guess', durationMs: null, min: 0, max: 200, xmin: false, p1: false } };
   },

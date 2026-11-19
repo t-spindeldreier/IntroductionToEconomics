@@ -262,25 +262,31 @@ describe('before and after, and the table', () => {
 });
 
 describe('the restaurant game', () => {
-  it('gives every phone a real restaurant and compares the class with the study', async () => {
-    const { storeOf, summariseRestaurant, realRows, didOf } = await import('../../src/activities/restaurant/def');
+  it('deals out real restaurants without duplicates and compares the class with the study', async () => {
+    const { assignStores, storeAt, summariseRestaurant, realRows, didOf, classTakeawayOf } = await import('../../src/activities/restaurant/def');
     const { STORES } = await import('../../src/activities/restaurant/stores');
-    expect(STORES.map((s) => s.length)).toEqual([60, 60]);
-    // Table 3 of Card and Krueger (1994)
-    expect(didOf(realRows())).toBe(2.7); // 2.76 unrounded
-    const pids = Array.from({ length: 200 }, (_, i) => pidOf('s' + i));
-    const states = pids.map((p) => storeOf(p, 'burger').state);
-    expect(states.filter((s) => s === 0).length).toBeGreaterThan(70);
-    expect(states.filter((s) => s === 1).length).toBeGreaterThan(70);
+    expect(STORES.map((s) => s.length)).toEqual([100, 70]);
+    expect(didOf(realRows())).toBe(2.7); // Table 3 of Card and Krueger (1994): 2.76 unrounded
+    const participants = new Map(Array.from({ length: 81 }, (_, i) =>
+      [pidOf('s' + i), { adj: 0, eco: 0, joinedAt: 1000 + i, fake: false }] as [string, any]));
+    const stores = assignStores(participants);
+    const codes = Object.values(stores);
+    expect(new Set(codes).size).toBe(81); // nobody shares a restaurant
+    expect(codes.filter((c) => c < 1000).length).toBe(41); // equally large groups, by order of joining
+    // a student who joins later does not change anybody else's restaurant
+    const later = new Map(participants).set('late', { adj: 0, eco: 0, joinedAt: 9999, fake: false } as any);
+    expect(assignStores(later)).toMatchObject(stores);
     // everyone keeps their staff, except New Jersey managers who cut two jobs
-    const responses = pids.map((pid, i) => {
-      const { state, store } = storeOf(pid, 'burger');
+    const responses = [...participants.keys()].map((pid, i) => {
+      const { state, store } = storeAt(stores[pid]);
       return { key: 'burger', pid, v: store[2] - (state === 0 ? 2 : 0), at: i, fake: false };
     });
-    const s = summariseRestaurant({ type: 'restaurant', id: 'burger' }, { responses: () => responses });
-    expect(s.rows[0].change).toBeCloseTo(-2);
-    expect(s.rows[1].change).toBeCloseTo(0);
-    expect(s.did).toBeCloseTo(-2);
+    const a = { type: 'restaurant', id: 'burger', classTakeaway: 'cut', classTakeawayNoCut: 'kept' };
+    const s = summariseRestaurant(a, { responses: () => responses, participants });
+    expect(s.rows.map((r) => r.change)).toEqual([-2, 0]);
+    expect(s.did).toBe(-2);
+    expect(classTakeawayOf(a, s.cut)).toBe('cut');
+    expect(classTakeawayOf(a, false)).toBe('kept');
     expect(s.closest[0].off).toBeLessThanOrEqual(s.closest[1].off);
   });
 });

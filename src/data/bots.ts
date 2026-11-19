@@ -4,7 +4,7 @@
 
 import type { Activity, Frame, OpenWindow } from '../core/types';
 import { armOf } from '../core/identity';
-import { storeOf } from '../activities/restaurant/def';
+import { storeAt } from '../activities/restaurant/def';
 
 export interface FakeAnswer {
   delayMs: number;
@@ -66,7 +66,9 @@ export function fakeAnswer(a: Activity, frame: Frame, open: OpenWindow, pid: str
 
   // restaurant game: simulated managers in New Jersey cut about a tenth of their staff
   if (a.type === 'restaurant') {
-    const { state, store } = storeOf(pid, a.id);
+    const code = (a.assignment as Record<string, number> | undefined)?.[pid];
+    if (code === undefined) return { delayMs, v: 20 };
+    const { state, store } = storeAt(code);
     return { delayMs, v: Math.max(1, Math.round(store[2] * (state === 0 ? 0.9 : 1) * Math.exp(0.06 * normal(rand)))) };
   }
 

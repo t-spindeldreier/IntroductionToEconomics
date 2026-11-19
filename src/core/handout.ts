@@ -14,7 +14,7 @@ import { countOptions, formatNumber } from './stats';
 import { armOf } from './identity';
 import { scatterSvg, summariseBar } from './scatter';
 import { barChartSvg } from './chart';
-import { didOf, realRows, summariseRestaurant, type StateRow } from '../activities/restaurant/def';
+import { classTakeawayOf, didOf, realRows, summariseRestaurant, type StateRow } from '../activities/restaurant/def';
 import { summariseChange, summariseGuess, part1Text, signed } from '../activities/guess/def';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -156,7 +156,7 @@ export function studySlidesHtml(session: Session, live: LiveData | null, code: s
       slide(kicker, `<h2>${rich(a.news)}</h2>
         <p>Every student managed one real fast-food restaurant, in New Jersey (minimum wage raised from $4.25 to $5.05) or in Pennsylvania (no change), and decided how many employees to have in November.</p>
         ${live ? `<p class="label">What the class decided (average employees per restaurant)</p>${stateTable(summariseRestaurant(a, live).rows, 'November (plans)')}` : ''}
-        ${a.classTakeaway ? `<p class="muted">${rich(a.classTakeaway)}</p>` : ''}`);
+        ${a.classTakeaway ? `<p class="muted">${rich(classTakeawayOf(a, live ? summariseRestaurant(a, live).cut : true))}</p>` : ''}`);
       slide(kicker, `<h2>What really happened</h2>
         <p class="label">All 410 restaurants of the study (average employees per restaurant, full-time equivalents)</p>
         ${stateTable(realRows(), 'November 1992')}

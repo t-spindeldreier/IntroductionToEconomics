@@ -7,34 +7,52 @@ import { nickname } from '../../core/nicknames';
 import { answerCount, type StageEnv, type StageViewFn } from '../../stage/env';
 import { ARM_COLOURS } from '../../stage/plots';
 import { modePill } from '../../ui/pill';
-import { STATES, didOf, realRows, storeOf, summariseRestaurant, type StateRow } from './def';
-import { MAP_H, MAP_PATHS, MAP_PLACES, MAP_W } from './map';
+import { STATES, assignStores, classTakeawayOf, didOf, realRows, storeAt, summariseRestaurant, type StateRow } from './def';
+import { MAP_COUNTIES, MAP_H, MAP_PLACES, MAP_STATES, MAP_W } from './map';
 
 const one = (x: number | null) => (x === null ? '–' : x.toFixed(1));
 const signed = (x: number | null) => (x === null ? '–' : `${x > 0.049 ? '+' : x < -0.049 ? '−' : ''}${Math.abs(x).toFixed(1)}`);
 
-/** New Jersey and eastern Pennsylvania, one dot per manager in the room. */
-function map(env: StageEnv, highlight: boolean): HTMLElement {
+/**
+ * New Jersey and eastern Pennsylvania with their counties, one dot per manager in
+ * the room. After the news, New Jersey is picked out.
+ */
+function map(env: StageEnv, news: boolean): HTMLElement {
   const dots: string[] = [];
   const counts = [0, 0];
-  for (const pid of env.ctl.participants.keys()) {
-    const { state, store } = storeOf(pid, env.activity.id);
+  for (const code of Object.values(assignStores(env.ctl.participants))) {
+    const { state, store } = storeAt(code);
     counts[state]++;
-    dots.push(`<circle cx="${store[5]}" cy="${store[6]}" r="13" fill="${ARM_COLOURS[state]}" stroke="#fff" stroke-width="3" opacity="0.9"/>`);
+    dots.push(`<circle cx="${store[5]}" cy="${store[6]}" r="11" fill="${ARM_COLOURS[state]}" stroke="#fff" stroke-width="3"/>`);
   }
-  const land = (name: string, fill: string) => `<path d="${MAP_PATHS[name]}" fill="${fill}" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>`;
-  const label = (x: number, y: number, text: string, size: number, weight: number, fill: string) =>
-    `<text x="${x}" y="${y}" text-anchor="middle" font-size="${size}" font-weight="${weight}" fill="${fill}" letter-spacing="2">${text}</text>`;
-  const city = (x: number, y: number, name: string) =>
-    `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" fill="#16181d"/><text x="${x + 14}" y="${y + 10}" font-size="30" fill="#16181d">${name}</text>`;
+  const land = (name: string, fill: string) => `<path d="${MAP_STATES[name]}" fill="${fill}" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>`;
+  const counties = (name: string) => `<path d="${MAP_COUNTIES[name]}" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.75"/>`;
+  // Text with a light halo, so that it stays readable on top of borders and dots.
+  const text = (p: number[], t: string, size: number, o: { weight?: number; fill?: string; spacing?: number; italic?: boolean; dy?: number } = {}) =>
+    `<text x="${p[0]}" y="${p[1] + (o.dy ?? 0)}" text-anchor="middle" font-size="${size}" font-weight="${o.weight ?? 400}" fill="${o.fill ?? '#16181d'}"` +
+    ` letter-spacing="${o.spacing ?? 0}" ${o.italic ? 'font-style="italic"' : ''} stroke="#fff" stroke-opacity="0.85" stroke-width="7" paint-order="stroke" stroke-linejoin="round">${t}</text>`;
+  const city = (p: number[], name: string) =>
+    `<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="#fff" stroke="#16181d" stroke-width="3"/>` +
+    text([p[0], p[1]], name, 26, { dy: -14 });
   const box = h('div', { class: 'map-box' });
   box.innerHTML = `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" class="map" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of New Jersey and eastern Pennsylvania">
-    <rect width="${MAP_W}" height="${MAP_H}" fill="#d6e4f0"/>
-    ${['New York', 'Connecticut', 'Delaware', 'Maryland'].map((n) => land(n, '#e9e6df')).join('')}
-    ${land('Pennsylvania', highlight ? '#ece9e2' : '#f6e3d2')}${land('New Jersey', highlight ? '#bcd9ee' : '#d5e6f3')}
-    ${label(MAP_PLACES.pa[0], MAP_PLACES.pa[1], 'PENNSYLVANIA', 40, 800, '#5a6270')}${label(MAP_PLACES.nj[0], MAP_PLACES.nj[1], 'NEW', 40, 800, '#14304f')}${label(MAP_PLACES.nj[0], MAP_PLACES.nj[1] + 46, 'JERSEY', 40, 800, '#14304f')}
-    ${dots.join('')}
-    ${city(MAP_PLACES.philadelphia[0], MAP_PLACES.philadelphia[1], 'Philadelphia')}${city(MAP_PLACES.newYork[0], MAP_PLACES.newYork[1], 'New York')}
+    <defs>
+      <linearGradient id="sea" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#cfe0ee"/><stop offset="1" stop-color="#b9d2e6"/></linearGradient>
+      <filter id="lift" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#14304f" flood-opacity="0.35"/></filter>
+    </defs>
+    <rect width="${MAP_W}" height="${MAP_H}" fill="url(#sea)"/>
+    ${['New York', 'Connecticut', 'Delaware', 'Maryland'].map((n) => land(n, '#ebe9e3')).join('')}
+    ${land('Pennsylvania', '#f4ead8')}${counties('Pennsylvania')}
+    <g ${news ? 'filter="url(#lift)"' : ''}>${land('New Jersey', news ? '#bfe0c9' : '#dfeadf')}</g>${counties('New Jersey')}
+    ${news ? `<path d="${MAP_STATES['New Jersey']}" fill="none" stroke="#1a7f4b" stroke-width="6" stroke-linejoin="round"/>` : ''}
+    ${text(MAP_PLACES.ocean, 'Atlantic', 30, { fill: '#5d7f9c', italic: true })}${text(MAP_PLACES.ocean, 'Ocean', 30, { fill: '#5d7f9c', italic: true, dy: 36 })}
+    ${text(MAP_PLACES.ny, 'NEW YORK', 26, { fill: '#8a8f99', weight: 700, spacing: 3 })}
+    <g>${dots.join('')}</g>
+    ${text(MAP_PLACES.pa, 'PENNSYLVANIA', 38, { weight: 800, fill: '#7a4a12', spacing: 3 })}
+    ${text(MAP_PLACES.pa, '$4.25', 34, { weight: 800, fill: '#7a4a12', dy: 44 })}
+    ${text(MAP_PLACES.nj, 'NEW JERSEY', 38, { weight: 800, fill: '#14532d', spacing: 3 })}
+    ${text(MAP_PLACES.nj, news ? '$4.25 → $5.05' : '$4.25', 34, { weight: 800, fill: news ? '#b3261e' : '#14532d', dy: 44 })}
+    ${city(MAP_PLACES.philadelphia, 'Philadelphia')}${city(MAP_PLACES.newYork, 'New York City')}${city(MAP_PLACES.trenton, 'Trenton')}
   </svg>`;
   return h('div', { class: 'map-panel' }, box,
     h('p', { class: 'map-legend' }, STATES.map((name, i) => h('span', null,
@@ -77,7 +95,7 @@ export const restaurantStage: StageViewFn = (env) => {
     return h('div', { class: 'view' },
       h('h1', { class: 'headline' }, S.classDecided),
       table(s.rows, S.nov1992Plan),
-      didCard(s.rows, a.classTakeaway));
+      didCard(s.rows, classTakeawayOf(a, s.cut)));
   }
   if (phase === 'real') {
     const real = realRows();

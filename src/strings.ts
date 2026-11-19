@@ -100,6 +100,8 @@ export const S = {
   newsNJ: (wage: string, min: string, pct: number) => `Your starting wage was ${wage}. From 1 April you must pay at least ${min}: ${pct}% more for every new worker.`,
   newsNJAbove: (wage: string) => `You already pay ${wage}, more than the new minimum. But your competitors must now pay more.`,
   newsPA: (min: string) => `Nothing changes for you: in Pennsylvania the minimum wage stays at ${min}.`,
+  newsThink: 'Something has to give: fewer staff, higher prices, or less profit?',
+  restaurantSoon: 'You will get your restaurant in a moment.',
   employeesNovember: 'Employees in November',
   employeesInvalid: 'Please enter a whole number between 0 and 200.',
   nowYouHave: (n: number) => `now ${n} employees`,
